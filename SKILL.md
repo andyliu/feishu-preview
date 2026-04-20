@@ -77,22 +77,23 @@ docs/
 
 ## 三、本地预览（文字 + 图表整体预览）
 
-```bash
-# 精确模式（默认）— 使用飞书官方 whiteboard-cli 渲染，与飞书完全一致
-feishu-preview preview docs/diagrams/device-keygen.md
+> **🔴 强制规则：预览必须且只能通过以下命令完成。**
+> **严禁自行生成任何 HTML 文件、严禁内嵌 Mermaid.js CDN、严禁使用任何其他渲染方式。**
+> `feishu-preview` 是全局安装的 npm 命令，在任何工程目录下均可直接调用。
 
-# 快速模式 — Mermaid.js CDN 交互 SVG，秒级渲染，适合快速调试语法
-feishu-preview preview docs/diagrams/device-keygen.md --fast
+```bash
+# 唯一正确的预览命令 — 使用飞书官方 whiteboard-cli 渲染为 PNG
+feishu-preview preview <file>.md
 ```
 
-**⚠️ 始终使用精确模式（不加 `--fast`）生成最终预览。只有在调试 Mermaid 语法错误时才使用快速模式。**
+输出：与飞书完全一致的本地 HTML（图表为 whiteboard-cli 生成的 PNG，非 Mermaid SVG）。
 
-**两种模式说明：**
+**⚠️ `--fast` 仅限语法调试，不得用于展示给用户的最终预览：**
 
-| 模式 | 命令 | 渲染引擎 | 用途 |
-|---|---|---|---|
-| **精确模式**（默认） | 不加 `--fast` | `@larksuite/whiteboard-cli` — 飞书官方引擎，输出 PNG | 最终确认，与飞书展示效果像素级一致 |
-| **快速模式** | 加 `--fast` | Mermaid.js v10 CDN — 交互 SVG | 快速调试语法，不代表飞书实际效果 |
+```bash
+# 仅在 Mermaid 语法报错时使用，帮助在浏览器控制台查看错误
+feishu-preview preview <file>.md --fast
+```
 
 ---
 
@@ -330,10 +331,16 @@ feishu-preview push docs/diagrams/device-keygen.md \
 
 ## 九、禁止操作
 
+**预览相关（最高优先级）：**
+- 🔴 **不得自行生成任何 HTML 预览文件** — 无论任何情况，必须调用 `feishu-preview preview <file>` 命令
+- 🔴 **不得在生成的 HTML 中内嵌 Mermaid.js CDN** — 图表必须由 whiteboard-cli 渲染为 PNG
+- 🔴 **不得使用 `--fast` 标志生成展示给用户的最终预览** — `--fast` 仅限语法调试
+- 不得使用任何其他 Markdown 预览工具替代 `feishu-preview preview`
+
+**同步相关：**
 - 不得直接通过飞书 API 修改 Whiteboard block 内容（用 `+whiteboard-update` 或删旧建新）
 - 不得使用 `overwrite` 模式覆盖整篇文档（会破坏其他 block）
 - 不得跳过预览步骤直接同步
-- 不得跳过 `--dry-run` 直接执行修改
 - 不得修改源 `.md` 文件的 Mermaid 代码以适应飞书（转换在临时文件进行）
 
 ---
