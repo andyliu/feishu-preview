@@ -1,6 +1,6 @@
 {
   "name": "feishu-preview",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Claude Code skill + CLI for Feishu Mermaid diagram preview and sync",
   "bin": {
     "feishu-preview": "plugins/feishu-preview/bin/feishu-preview"
