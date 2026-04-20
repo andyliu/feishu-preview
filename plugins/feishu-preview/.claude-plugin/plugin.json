@@ -1,0 +1,7 @@
+{
+  "name": "feishu-preview",
+  "version": "1.0.4",
+  "description": "Feishu (Lark) Mermaid diagram workflow: compatibility check, accurate preview via Feishu's own whiteboard-cli engine, and sync via lark-cli",
+  "skills": ["skills/feishu-preview"],
+  "bin": "bin"
+}

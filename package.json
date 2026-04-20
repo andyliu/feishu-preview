@@ -1,15 +1,14 @@
 {
   "name": "feishu-preview",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Claude Code skill + CLI for Feishu Mermaid diagram preview and sync",
   "bin": {
-    "feishu-preview": "sync.js"
+    "feishu-preview": "plugins/feishu-preview/bin/feishu-preview"
   },
   "files": [
-    "sync.js",
-    "render-preview.js",
-    "feishu-compat.js",
-    "SKILL.md"
+    "plugins/",
+    ".claude-plugin/",
+    "README.md"
   ],
   "engines": {
     "node": ">=16"
@@ -21,6 +20,7 @@
     "preview",
     "claude-code",
     "skill",
+    "plugin",
     "diagram"
   ],
   "license": "MIT",

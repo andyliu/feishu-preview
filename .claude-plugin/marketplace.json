@@ -1,0 +1,14 @@
+{
+  "name": "feishu-preview",
+  "description": "Feishu (Lark) Mermaid diagram workflow: compatibility check, accurate local preview, and sync",
+  "version": "1.0.4",
+  "publisher": "andyliu",
+  "homepage": "https://github.com/andyliu/feishu-preview",
+  "plugins": [
+    {
+      "path": "plugins/feishu-preview",
+      "name": "feishu-preview",
+      "description": "Check, preview, and sync Mermaid diagrams for Feishu (Lark) documents"
+    }
+  ]
+}

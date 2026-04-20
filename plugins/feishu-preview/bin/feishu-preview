@@ -1,43 +1,43 @@
 #!/usr/bin/env node
 /**
- * feishu-preview — 飞书 Mermaid 图表全流程 CLI 入口
+ * feishu-preview — Feishu Mermaid diagram workflow CLI
  *
- * 子命令:
- *   feishu-preview install-skill                         安装 Claude Code 技能定义
- *   feishu-preview check   <file>                        检查飞书兼容性（只读）
- *   feishu-preview convert <file> [-w] [-o output.md]    飞书兼容转换
- *   feishu-preview preview <file> [--fast]               本地预览
- *   feishu-preview status  <file>                        显示同步状态
- *   feishu-preview push    <file> --doc-url <url>        推送到飞书
+ * Subcommands:
+ *   feishu-preview install-skill                         Install Claude Code skill definition
+ *   feishu-preview check   <file>                        Check Feishu compatibility (read-only)
+ *   feishu-preview convert <file> [-w] [-o output.md]    Convert to Feishu-compatible format
+ *   feishu-preview preview <file> [--fast]               Local preview (accurate mode by default)
+ *   feishu-preview status  <file>                        Show sync status from .feishu-index.json
+ *   feishu-preview push    <file> --doc-url <url>        Push to Feishu document
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execFileSync, spawnSync } = require('child_process');
 
-const SCRIPTS_DIR = __dirname;
+const BIN_DIR = __dirname;
 const INDEX_FILE = '.feishu-index.json';
 
 function usage() {
   console.log(`
-用法: feishu-preview <command> [file] [options]
+Usage: feishu-preview <command> [file] [options]
 
-命令:
-  install-skill                      安装 Claude Code 技能到 ~/.claude/skills/
-  check   <file>                     检查飞书兼容性（不修改文件，exit 1 表示有问题）
-  convert <file> [-o output.md]      转换为飞书兼容格式（不修改源文件）
-          <file> -w                  原地修正源文件
-  preview <file> [--fast]            生成 HTML 预览并打开浏览器
-                                       默认：whiteboard-cli 精确模式（与飞书一致）
-                                       --fast：Mermaid.js 快速模式（即时交互）
-  status  <file>                     显示 .feishu-index.json 中的同步状态
-  push    <file> --doc-url <url>     推送到飞书（需要 lark-cli）
+Commands:
+  install-skill                      Install Claude Code skill to ~/.claude/skills/
+  check   <file>                     Check Feishu compatibility (read-only, exit 1 = issues)
+  convert <file> [-o output.md]      Convert to Feishu-compatible format (stdout or new file)
+          <file> -w                  Convert and overwrite source file in-place
+  preview <file> [--fast]            Generate HTML preview and open in browser
+                                       default: whiteboard-cli accurate mode (matches Feishu exactly)
+                                       --fast:  Mermaid.js fast mode (instant, for syntax debugging only)
+  status  <file>                     Show .feishu-index.json sync status
+  push    <file> --doc-url <url>     Push to Feishu (requires lark-cli)
 
-工作流:
-  1. feishu-preview check   docs/my-diagram.md    # 编写完检查兼容性
-  2. feishu-preview convert docs/my-diagram.md -w # 自动修正
-  3. feishu-preview preview docs/my-diagram.md    # 预览效果
-  # 同步到飞书由 Claude Code 技能引导完成
+Workflow:
+  1. feishu-preview check   docs/my-diagram.md    # check after writing
+  2. feishu-preview convert docs/my-diagram.md -w # auto-fix issues
+  3. feishu-preview preview docs/my-diagram.md    # verify locally
+  # Sync to Feishu is guided by the Claude Code skill
 `);
   process.exit(1);
 }
@@ -51,27 +51,27 @@ if (!command) usage();
 if (command === 'install-skill') {
   const os = require('os');
   const skillsDir = path.join(os.homedir(), '.claude', 'skills', 'feishu-preview');
-  const srcSkill = path.join(SCRIPTS_DIR, 'SKILL.md');
+  const srcSkill = path.join(BIN_DIR, '..', 'skills', 'feishu-preview', 'SKILL.md');
   if (!fs.existsSync(srcSkill)) {
-    console.error(`错误: SKILL.md 不存在: ${srcSkill}`);
+    console.error(`Error: SKILL.md not found at: ${srcSkill}`);
     process.exit(1);
   }
   fs.mkdirSync(skillsDir, { recursive: true });
   fs.copyFileSync(srcSkill, path.join(skillsDir, 'SKILL.md'));
-  console.log(`✅ Claude Code 技能已安装`);
-  console.log(`   位置: ${path.join(skillsDir, 'SKILL.md')}`);
-  console.log(`\n在 Claude Code 中可以说:`);
-  console.log(`   "检查 my-doc.md 的飞书兼容性"`);
-  console.log(`   "预览 my-doc.md"`);
-  console.log(`   "同步 my-doc.md 到飞书文档"`);
+  console.log(`✅ Claude Code skill installed`);
+  console.log(`   Location: ${path.join(skillsDir, 'SKILL.md')}`);
+  console.log(`\nIn Claude Code, you can now say:`);
+  console.log(`   "Check my-doc.md for Feishu compatibility"`);
+  console.log(`   "Preview my-doc.md"`);
+  console.log(`   "Sync my-doc.md to Feishu"`);
   process.exit(0);
 }
 
-// 以下命令需要 <file> 参数
+// Commands below require a <file> argument
 const inputFile = args[1];
 if (!inputFile) usage();
 if (!fs.existsSync(inputFile)) {
-  console.error(`错误: 文件不存在: ${inputFile}`);
+  console.error(`Error: File not found: ${inputFile}`);
   process.exit(1);
 }
 
@@ -92,14 +92,14 @@ function writeIndex(data) {
 
 // ── check ─────────────────────────────────────────────────────────────────────
 if (command === 'check') {
-  const compatScript = path.join(SCRIPTS_DIR, 'feishu-compat.js');
+  const compatScript = path.join(BIN_DIR, 'feishu-compat.js');
   const result = spawnSync(process.execPath, [compatScript, absInput, '--check'], { stdio: 'inherit' });
   process.exit(result.status ?? 0);
 }
 
 // ── convert ───────────────────────────────────────────────────────────────────
 if (command === 'convert') {
-  const compatScript = path.join(SCRIPTS_DIR, 'feishu-compat.js');
+  const compatScript = path.join(BIN_DIR, 'feishu-compat.js');
   const outIdx = args.indexOf('-o');
   const outputFile = outIdx !== -1 ? args[outIdx + 1] : null;
   const writeInPlace = args.includes('-w');
@@ -110,7 +110,7 @@ if (command === 'convert') {
 
 // ── preview ───────────────────────────────────────────────────────────────────
 if (command === 'preview') {
-  const previewScript = path.join(SCRIPTS_DIR, 'render-preview.js');
+  const previewScript = path.join(BIN_DIR, 'render-preview.js');
   const extraFlags = args.filter(a => a.startsWith('--'));
   const result = spawnSync(process.execPath, [previewScript, absInput, ...extraFlags], { stdio: 'inherit' });
   process.exit(result.status ?? 0);
@@ -121,15 +121,15 @@ if (command === 'status') {
   const idx = readIndex();
   const entry = idx[basename];
   if (!entry) {
-    console.log(`[${basename}] 未在 ${INDEX_FILE} 中记录，尚未同步过。`);
+    console.log(`[${basename}] Not found in ${INDEX_FILE} — never synced.`);
   } else {
-    console.log(`[${basename}] 同步状态:`);
-    console.log(`  doc_url:     ${entry.doc_url || '(未记录)'}`);
-    console.log(`  last_synced: ${entry.last_synced || '(从未同步)'}`);
+    console.log(`[${basename}] Sync status:`);
+    console.log(`  doc_url:     ${entry.doc_url || '(not recorded)'}`);
+    console.log(`  last_synced: ${entry.last_synced || '(never)'}`);
     const wbs = entry.whiteboards || {};
     const wbCount = Object.keys(wbs).length;
     if (wbCount > 0) {
-      console.log(`  whiteboards: ${wbCount} 个图表`);
+      console.log(`  whiteboards: ${wbCount} diagram(s)`);
       Object.entries(wbs).forEach(([title, token]) => {
         console.log(`    ${title}: ${token}`);
       });
@@ -144,7 +144,7 @@ if (command === 'push') {
   const docUrl = docUrlIdx !== -1 ? args[docUrlIdx + 1] : null;
 
   if (!docUrl) {
-    console.error('错误: push 命令需要 --doc-url <url>');
+    console.error('Error: push requires --doc-url <url>');
     process.exit(1);
   }
 
@@ -154,20 +154,20 @@ if (command === 'push') {
 
   console.log(`\n=== feishu-preview push: ${basename} ===\n`);
 
-  // Step 1: 本地预览
-  console.log('步骤 1/4: 生成本地预览...');
-  const previewScript = path.join(SCRIPTS_DIR, 'render-preview.js');
+  // Step 1: Local preview
+  console.log('Step 1/4: Generating local preview...');
+  const previewScript = path.join(BIN_DIR, 'render-preview.js');
   spawnSync(process.execPath, [previewScript, absInput], { stdio: 'inherit' });
-  console.log('请在浏览器确认预览效果，然后继续...\n');
+  console.log('Review the preview in your browser, then continue.\n');
 
-  // Step 2: 飞书兼容转换
-  console.log('步骤 2/4: 飞书兼容性转换...');
+  // Step 2: Feishu compatibility conversion
+  console.log('Step 2/4: Converting to Feishu-compatible format...');
   const tmpFile = path.join(require('os').tmpdir(), `${basename}-feishu.md`);
-  const compatScript = path.join(SCRIPTS_DIR, 'feishu-compat.js');
+  const compatScript = path.join(BIN_DIR, 'feishu-compat.js');
   spawnSync(process.execPath, [compatScript, absInput, '-o', tmpFile], { stdio: 'inherit' });
 
-  // Step 3: 读取文档当前状态
-  console.log('\n步骤 3/4: 读取飞书文档当前状态...');
+  // Step 3: Read current document state
+  console.log('\nStep 3/4: Reading current Feishu document state...');
   console.log(`  lark-cli docs +fetch --doc "${docUrl}" --format json\n`);
   try {
     const fetchOut = execFileSync('lark-cli', ['docs', '+fetch', '--doc', docUrl, '--format', 'json'], {
@@ -176,33 +176,34 @@ if (command === 'push') {
     const doc = JSON.parse(fetchOut);
     const wbTokens = extractWhiteboardTokens(doc);
     if (wbTokens.length > 0) {
-      console.log('  发现 whiteboard block token(s):');
+      console.log('  Found whiteboard block token(s):');
       wbTokens.forEach(t => console.log(`    - ${t}`));
     } else {
-      console.log('  未找到 whiteboard block（文档中尚无 Mermaid 图表）');
+      console.log('  No whiteboard blocks found (no Mermaid diagrams in document yet).');
     }
   } catch (e) {
-    console.error(`  警告: lark-cli +fetch 失败: ${e.message}`);
+    console.error(`  Warning: lark-cli +fetch failed: ${e.message}`);
   }
 
-  // Step 4: 显示推送命令
-  console.log('\n步骤 4/4: 推送计划...');
+  // Step 4: Show push commands
+  console.log('\nStep 4/4: Push plan...');
   if (wbToken) {
-    console.log(`  [推荐] 使用 +whiteboard-update 更新 whiteboard (token: ${wbToken})`);
-    console.log(`  命令:`);
-    console.log(`    node feishu-compat.js "${absInput}" | awk '/\`\`\`mermaid/{p=1;next} /^\`\`\`$/{if(p)exit} p' \\`);
+    console.log(`  [Recommended] Use +whiteboard-update to update whiteboard (token: ${wbToken})`);
+    console.log(`  Command:`);
+    console.log(`    feishu-preview convert "${absInput}" \\`);
+    console.log(`      | awk '/\`\`\`mermaid/{p=1;next} /^\`\`\`$/{if(p)exit} p' \\`);
     console.log(`      | lark-cli docs +whiteboard-update --whiteboard-token "${wbToken}" --overwrite --yes`);
   } else {
-    const title = entry.diagram_title || '（请在 .feishu-index.json 中设置 diagram_title）';
-    console.log(`  [备用] 在标题 "${title}" 后插入 mermaid 代码块`);
-    console.log(`  命令:`);
+    const title = entry.diagram_title || '(set diagram_title in .feishu-index.json)';
+    console.log(`  [First-time] Insert mermaid block after heading: "${title}"`);
+    console.log(`  Command:`);
     console.log(`    lark-cli docs +update --doc "${docUrl}" --mode insert_after \\`);
     console.log(`      --selection-by-title "${title}" --markdown @"${tmpFile}"`);
   }
 
   idx[basename] = { ...entry, doc_url: docUrl, last_synced: new Date().toISOString() };
   writeIndex(idx);
-  console.log(`\n✅ ${INDEX_FILE} 已更新`);
+  console.log(`\n✅ ${INDEX_FILE} updated`);
   process.exit(0);
 }
 

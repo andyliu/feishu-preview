@@ -31,19 +31,35 @@
 
 ### 第一步：安装
 
+**方式 A：Claude Code 插件（推荐，自动更新）**
+
+在 Claude Code 里运行：
+
+```
+/plugin marketplace add andyliu/feishu-preview
+```
+
+插件会自动安装 CLI 工具和 Claude Code 技能定义，后续版本更新也是自动的。
+
+**方式 B：npm 全局安装**
+
 ```bash
 npm install -g feishu-preview
 ```
 
 > 需要 Node.js ≥ 16，没有的话先去 [nodejs.org](https://nodejs.org) 下载安装。
 
-### 第二步：安装 Claude Code 技能（可选但推荐）
+### 第二步：安装 Claude Code 技能（仅 npm 安装时需要）
+
+如果通过 npm 安装，需要手动安装技能定义：
 
 ```bash
 feishu-preview install-skill
 ```
 
 这会把技能定义文件复制到 `~/.claude/skills/feishu-preview/SKILL.md`，之后在 Claude Code 里直接用自然语言操作。
+
+> 使用 Claude Code 插件安装时，技能会自动注册，无需此步骤。
 
 ### 第三步：使用
 
@@ -143,6 +159,7 @@ feishu-preview status docs/my-diagram.md
 |---|---|---|
 | Node.js ≥ 16 | 运行所有脚本 | [nodejs.org](https://nodejs.org) |
 | Claude Code | 使用自然语言技能（可选） | [claude.ai/code](https://claude.ai/code) |
+| `feishu-preview` | 本工具 | `/plugin marketplace add andyliu/feishu-preview` 或 `npm install -g feishu-preview` |
 | `@larksuite/whiteboard-cli` | 精确预览模式（npx 自动拉取） | 无需手动安装 |
 | `lark-cli` | 飞书文档同步（仅推送时需要） | `npm install -g @larksuite/lark-cli` |
 
@@ -154,13 +171,20 @@ feishu-preview status docs/my-diagram.md
 
 ```
 feishu-preview/
-├── sync.js              # CLI 入口（feishu-preview 命令）
-├── render-preview.js    # Markdown → HTML 预览生成器
-├── feishu-compat.js     # Mermaid 飞书兼容性转换器
-├── SKILL.md             # Claude Code 技能定义
-├── package.json
-└── test/
-    └── demo-iot-protocol.md   # 演示文档（8 种图表类型，中英双语）
+├── .claude-plugin/
+│   └── marketplace.json         # Claude Code 插件市场描述
+├── plugins/
+│   └── feishu-preview/
+│       ├── .claude-plugin/
+│       │   └── plugin.json      # 插件元数据
+│       ├── bin/
+│       │   ├── feishu-preview   # CLI 入口（feishu-preview 命令）
+│       │   ├── render-preview.js  # Markdown → HTML 预览生成器
+│       │   └── feishu-compat.js   # Mermaid 飞书兼容性转换器
+│       └── skills/
+│           └── feishu-preview/
+│               └── SKILL.md     # Claude Code 技能定义
+└── package.json
 ```
 
 ---
@@ -222,19 +246,36 @@ This tool uses **Feishu's own official `whiteboard-cli` rendering engine** for l
 
 ### Step 1: Install
 
+**Option A: Claude Code Plugin (recommended — auto-updates)**
+
+In Claude Code, run:
+
+```
+/plugin marketplace add andyliu/feishu-preview
+```
+
+This installs both the CLI and the Claude Code skill definition automatically.
+Future updates are applied at startup — no manual reinstall needed.
+
+**Option B: npm global install**
+
 ```bash
 npm install -g feishu-preview
 ```
 
 > Requires Node.js ≥ 16. Download from [nodejs.org](https://nodejs.org) if needed.
 
-### Step 2: Install the Claude Code Skill (optional but recommended)
+### Step 2: Install the Claude Code Skill (npm install only)
+
+If you installed via npm, register the skill manually:
 
 ```bash
 feishu-preview install-skill
 ```
 
 This copies the skill definition to `~/.claude/skills/feishu-preview/SKILL.md`, enabling natural language control from Claude Code.
+
+> If you used the Claude Code plugin, the skill is registered automatically — skip this step.
 
 ### Step 3: Use It
 
@@ -334,6 +375,7 @@ After syncing to Feishu, the tool writes `.feishu-index.json` alongside your `.m
 |---|---|---|
 | Node.js ≥ 16 | Run all scripts | [nodejs.org](https://nodejs.org) |
 | Claude Code | Natural language skill interface (optional) | [claude.ai/code](https://claude.ai/code) |
+| `feishu-preview` | This tool | `/plugin marketplace add andyliu/feishu-preview` or `npm install -g feishu-preview` |
 | `@larksuite/whiteboard-cli` | Accurate preview mode (auto-fetched via npx) | Not needed manually |
 | `lark-cli` | Feishu document sync (push only) | `npm install -g @larksuite/lark-cli` |
 
@@ -345,13 +387,20 @@ After syncing to Feishu, the tool writes `.feishu-index.json` alongside your `.m
 
 ```
 feishu-preview/
-├── sync.js              # CLI entry point (the feishu-preview command)
-├── render-preview.js    # Markdown → HTML preview generator
-├── feishu-compat.js     # Mermaid Feishu compatibility converter
-├── SKILL.md             # Claude Code skill definition
-├── package.json
-└── test/
-    └── demo-iot-protocol.md   # Demo document: 8 diagram types, bilingual
+├── .claude-plugin/
+│   └── marketplace.json           # Claude Code plugin marketplace manifest
+├── plugins/
+│   └── feishu-preview/
+│       ├── .claude-plugin/
+│       │   └── plugin.json        # Plugin metadata
+│       ├── bin/
+│       │   ├── feishu-preview     # CLI entry point (the feishu-preview command)
+│       │   ├── render-preview.js  # Markdown → HTML preview generator
+│       │   └── feishu-compat.js   # Mermaid Feishu compatibility converter
+│       └── skills/
+│           └── feishu-preview/
+│               └── SKILL.md       # Claude Code skill definition
+└── package.json
 ```
 
 ---
