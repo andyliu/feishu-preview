@@ -46,7 +46,7 @@ CLI 工具和 Claude Code 技能定义一并安装，后续版本更新自动完
 
 > 需要 Node.js ≥ 16。没有的话先去 [nodejs.org](https://nodejs.org) 下载安装。
 
-安装後首次运行任意命令时，工具会**自动**检查依赖（如 `lark-cli`）并交互式引导安装。无需手动执行额外步骤。
+安装后首次运行任意命令时，工具会**自动**检查依赖（如 `lark-cli`）并交互式引导安装。无需手动执行额外步骤。
 
 ### 第二步：使用
 
@@ -85,7 +85,6 @@ feishu-preview status docs/my-diagram.md
 | 命令 | 说明 |
 |---|---|
 | `feishu-preview doctor` | 检查并安装所有必要依赖（lark-cli 等），交互式引导 |
-| `feishu-preview install-skill` | 安装 Claude Code 技能定义到 `~/.claude/skills/` |
 | `feishu-preview check <file>` | 检查飞书兼容性，只读，exit 1 表示有问题 |
 | `feishu-preview convert <file> -w` | 原地修正源文件中所有不兼容语法 |
 | `feishu-preview convert <file> -o out.md` | 修正后输出到新文件（不改源文件） |
@@ -130,8 +129,7 @@ feishu-preview status docs/my-diagram.md
     "doc_url": "https://your-org.feishu.cn/docx/Xxxxx",
     "last_synced": "2026-04-20T10:00:00Z",
     "whiteboards": {
-      "2.1 注册时序图": "FY0FwuSKShMWuZbMjX0czKk6nLh",
-      "3.1 加密流程图": "ARJXwDxhchVthfblGrCcH5jmnfc"
+      "2.1 设备注册时序": "FY0FwuSKShMWuZbMjX0czKk6nLh"
     }
   }
 }
@@ -230,13 +228,6 @@ git add docs/diagrams/device-flow.md
 sequenceDiagram
     ...
 ```
-
-## 3.1 密钥派生流程
-
-```mermaid
-flowchart TD
-    ...
-```
 ```
 
 ### 精确预览 vs 调试模式
@@ -257,8 +248,6 @@ flowchart TD
 **Q：推送到飞书后想更新图表怎么操作？**
 
 修改本地 `.md` → `feishu-preview check` → `feishu-preview convert -w` → `feishu-preview preview` 确认效果 → Claude Code 说「同步到飞书」。
-
-**永远不要在飞书 Whiteboard 编辑器里直接修改 Mermaid 内容**——飞书不提供导出回源码的功能，修改后无法同步回本地。
 
 **Q：`stateDiagram-v2` 降级为 `stateDiagram` 会丢失功能吗？**
 
@@ -355,7 +344,6 @@ feishu-preview status docs/my-diagram.md
 | Command | Description |
 |---|---|
 | `feishu-preview doctor` | Check and install required dependencies (lark-cli etc.), interactive guided setup |
-| `feishu-preview install-skill` | Install Claude Code skill to `~/.claude/skills/` |
 | `feishu-preview check <file>` | Check Feishu compatibility (read-only; exit 1 = issues found) |
 | `feishu-preview convert <file> -w` | Fix all incompatible syntax in-place |
 | `feishu-preview convert <file> -o out.md` | Fix and write to a new file (source unchanged) |
@@ -400,8 +388,7 @@ After syncing to Feishu, the tool writes `.feishu-index.json` alongside your `.m
     "doc_url": "https://your-org.feishu.cn/docx/Xxxxx",
     "last_synced": "2026-04-20T10:00:00Z",
     "whiteboards": {
-      "2.1 Registration Sequence": "FY0FwuSKShMWuZbMjX0czKk6nLh",
-      "3.1 Encryption Flowchart": "ARJXwDxhchVthfblGrCcH5jmnfc"
+      "2.1 Device Registration Sequence": "FY0FwuSKShMWuZbMjX0czKk6nLh"
     }
   }
 }
@@ -500,13 +487,6 @@ Feishu uses headings as anchors for whiteboard placement. Keep a clear H2 headin
 sequenceDiagram
     ...
 ```
-
-## 3.1 Key Derivation Flow
-
-```mermaid
-flowchart TD
-    ...
-```
 ```
 
 ### Accurate Mode vs Debug Mode
@@ -527,8 +507,6 @@ Switch to fast mode for debugging: `feishu-preview preview file.md --fast`. The 
 **Q: I pushed a diagram and want to update it — how?**
 
 Edit local `.md` → `feishu-preview check` → `feishu-preview convert -w` → `feishu-preview preview` to confirm → tell Claude Code "sync to Feishu".
-
-**Never edit Mermaid content directly in Feishu's Whiteboard editor** — Feishu provides no way to export it back to source code.
 
 **Q: Does downgrading `stateDiagram-v2` to `stateDiagram` lose functionality?**
 
