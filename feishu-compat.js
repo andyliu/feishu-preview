@@ -14,11 +14,12 @@ const fs = require('fs');
 const args = process.argv.slice(2);
 const inputFile = args[0];
 const writeInPlace = args.includes('-w');
+const checkOnly = args.includes('--check');
 const outIdx = args.indexOf('-o');
 const outputFile = outIdx !== -1 ? args[outIdx + 1] : null;
 
 if (!inputFile) {
-  console.error('用法: node feishu-compat.js <input.md> [-w] [-o output.md]');
+  console.error('用法: node feishu-compat.js <input.md> [--check] [-w] [-o output.md]');
   process.exit(1);
 }
 
@@ -91,7 +92,17 @@ converted = converted.replace(
 );
 
 // 输出
-if (writeInPlace) {
+if (checkOnly) {
+  if (changes.length === 0) {
+    console.log('✅ 飞书兼容性检查通过 — 无需修改');
+  } else {
+    console.log(`⚠️  发现 ${changes.length} 处飞书不兼容语法：`);
+    changes.forEach(c => console.log(c));
+    console.log('\n运行以下命令自动修正：');
+    console.log(`  node feishu-compat.js "${inputFile}" -w`);
+    process.exit(1);
+  }
+} else if (writeInPlace) {
   fs.writeFileSync(inputFile, converted, 'utf-8');
   printSummary(inputFile);
 } else if (outputFile) {

@@ -1,32 +1,47 @@
 ---
-name: feishu-mermaid-sync
+name: feishu-preview
 description: >
-  本地 Markdown 文档（含 Mermaid 图表）的完整预览、飞书兼容性转换，
-  以及通过 lark-cli（主）/ feishu-mcp（辅）同步到飞书文档。
-  支持文档整体预览（文字+图表）、图表迭代更新（删旧建新）。
-  当用户需要预览本地文档、同步到飞书、更新飞书图表时触发。
+  飞书 Mermaid 图表全流程 Claude Code 技能：
+  编写图表后检查飞书兼容性并自动修正、精确本地预览（whiteboard-cli PNG，与飞书渲染一致），
+  以及通过 lark-cli 同步到飞书文档。
+  覆盖完整生命周期：写图表 → 检查 → 修正 → 预览 → 同步。
+  前置要求：npm install -g feishu-preview
 triggers:
+  - 写 mermaid
+  - 编写图表
+  - 添加图表
+  - 更新图表
+  - 画流程图
+  - 画时序图
+  - 保存文档
+  - 检查兼容性
+  - 检查飞书
   - 预览文档
   - 预览 markdown
+  - 飞书预览
   - 同步到飞书
   - 更新飞书图表
   - 推送飞书
   - 飞书文档更新
 ---
 
-# feishu-mermaid-sync Skill
+# feishu-preview Skill
 
 ## 一、整体工作流
 
 ```
-本地 .md 文件（唯一事实来源）
+编写/修改 Mermaid 图表
     │
-    ├─── [预览] → render-preview.js → .preview.html → 浏览器打开
+    ├─── [检查] → feishu-preview check  → 报告飞书不兼容语法
+    ├─── [修正] → feishu-preview convert -w → 原地修正源文件
     │
-    ├─── [转换] → feishu-compat.js  → 飞书兼容版 .md
+    ├─── [预览] → feishu-preview preview → .preview.html → 浏览器打开
+    │                （精确模式：whiteboard-cli PNG，与飞书效果一致）
+    │                （快速模式：--fast，Mermaid CDN 交互 SVG）
     │
     └─── [同步] → lark-cli（主）/ feishu-mcp（辅）→ 飞书文档
-                   删除旧 block → 在原位置插入新 block
+                   +whiteboard-update --overwrite（有 token）
+                   或 +update overwrite 写全文（首次）
 ```
 
 **核心原则：飞书文档是只读展示层，本地 .md 是唯一可编辑源。**
@@ -64,7 +79,7 @@ docs/
 
 ```bash
 # 生成预览 HTML 并自动在浏览器打开
-node sync.js preview docs/diagrams/device-keygen.md
+feishu-preview preview docs/diagrams/device-keygen.md
 # 或直接调用
 node render-preview.js docs/diagrams/device-keygen.md
 
@@ -96,7 +111,7 @@ node render-preview.js docs/diagrams/device-keygen.md
 
 ```bash
 # 转换并输出到新文件（不修改源文件）
-node sync.js convert docs/diagrams/device-keygen.md -o /tmp/device-keygen-feishu.md
+feishu-preview convert docs/diagrams/device-keygen.md -o /tmp/device-keygen-feishu.md
 # 或直接调用
 node feishu-compat.js docs/diagrams/device-keygen.md -o /tmp/device-keygen-feishu.md
 
@@ -222,35 +237,72 @@ lark-cli docs +fetch --doc "$DOC_URL" --format json \
 
 ## 七、完整执行流程（AI Agent 标准步骤）
 
-当用户说"同步文档到飞书"或"更新飞书图表"时，严格按以下顺序执行：
+本 skill 覆盖三个入口，可单独调用，也可顺序贯穿：
 
-> **⚠️ 强制暂停规则**：步骤 2 完成后，AI **必须停下来等待用户明确指令**。
-> 没有用户的显式确认，绝对不执行任何写入飞书的操作。
+---
+
+### 入口 A：编写 / 修改 Mermaid 图表后
+
+当用户在 markdown 文件中新增或修改了 Mermaid 代码块，完成编写后执行：
 
 ```
-1. 读取源文件和 .feishu-index.json
+1. 检查飞书兼容性
+   feishu-preview check <file>.md
+   → 若无问题：报告 ✅，结束（或继续到入口 B）
+   → 若有问题：列出具体问题，询问用户：
+     "发现 X 处飞书不兼容语法（如上）。是否自动修正源文件？（默认：否）"
 
-2. 生成本地预览
-   node sync.js preview <file>.md
+2. 若用户同意修正：
+   feishu-preview convert <file>.md -w
+   → 打印修改摘要
 
-   ⛔ 【强制暂停】预览打开后，询问用户：
+3. 询问是否预览：
+   "是否生成本地预览？（默认：否）"
+   → 用户同意 → 进入入口 B
+```
+
+---
+
+### 入口 B：预览本地文档
+
+当用户说「预览」「看看效果」「生成 HTML」时：
+
+```
+1. 生成预览
+   feishu-preview preview <file>.md        # 精确模式（默认，与飞书一致）
+   feishu-preview preview <file>.md --fast # 快速模式（CDN，即时交互）
+
+   ⛔ 【强制暂停】预览打开后询问：
       "预览已在浏览器打开。是否同步到飞书文档？（默认：否）"
-   → 等待用户明确回复，不得自行继续。
-   → 若用户回复「否」或不回复，流程结束。
+   → 等待用户明确回复。用户回复「否」或不回复 → 流程结束。
+   → 用户同意 → 进入入口 C
+```
 
-3. 飞书兼容性转换（仅当用户明确同意同步后）
-   node sync.js convert <file>.md -o /tmp/<file>-feishu.md
+---
 
-4. 同步所有图表到飞书
-   - 若 .feishu-index.json 中有 whiteboards 记录：
-     对每个图表执行 +whiteboard-update --overwrite --yes
+### 入口 C：同步到飞书
+
+当用户说「同步到飞书」「推送飞书」，或在入口 B 确认同步后执行：
+
+```
+1. 读取 .feishu-index.json 中 whiteboards 记录
+
+2. 飞书兼容性转换
+   feishu-preview convert <file>.md -o /tmp/<file>-feishu.md
+
+3. 同步所有图表
+   - 若 whiteboards 有记录（迭代更新）：
+     对每个图表执行：
+       cat <mermaid-code> | lark-cli docs +whiteboard-update \
+         --whiteboard-token <token> --overwrite --yes
    - 若无记录（首次同步）：
-     先 docs +update --mode overwrite 写入全文（含空白 whiteboard 占位符）
+     先 docs +update --mode overwrite 写入全文（含 <whiteboard type="blank"> 占位符）
      再对每个图表执行 +whiteboard-update --yes
+     记录返回的 board_tokens
 
-5. 更新 .feishu-index.json（whiteboard tokens、last_synced）
+4. 更新 .feishu-index.json（whiteboard tokens、last_synced）
 
-6. 汇报结果（飞书文档链接）
+5. 汇报结果（飞书文档链接）
 ```
 
 ---
@@ -259,16 +311,16 @@ lark-cli docs +fetch --doc "$DOC_URL" --format json \
 
 ```bash
 # 预览本地文档（文字 + Mermaid 图表）
-node sync.js preview docs/diagrams/device-keygen.md
+feishu-preview preview docs/diagrams/device-keygen.md
 
 # 转换为飞书兼容格式（输出摘要 + 写文件）
-node sync.js convert docs/diagrams/device-keygen.md [-o output.md]
+feishu-preview convert docs/diagrams/device-keygen.md [-o output.md]
 
 # 查看同步状态（读取 .feishu-index.json）
-node sync.js status docs/diagrams/device-keygen.md
+feishu-preview status docs/diagrams/device-keygen.md
 
 # 完整推送流程（含 dry-run 确认）
-node sync.js push docs/diagrams/device-keygen.md \
+feishu-preview push docs/diagrams/device-keygen.md \
   --doc-url "https://your-org.feishu.cn/docx/Xxxxx"
 ```
 

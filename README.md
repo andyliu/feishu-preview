@@ -1,225 +1,229 @@
-# feishu-mermaid-sync
+# feishu-preview
 
-> 本地 Markdown / Mermaid 预览与飞书文档同步工具链（零 npm 依赖）
+> 飞书 Mermaid 图表全流程 **Claude Code 技能** + CLI 工具
 >
-> Zero-npm-dependency toolchain for local Markdown/Mermaid preview and Feishu (Lark) document sync
+> A Claude Code skill (+ CLI) for the full Mermaid-in-Feishu lifecycle:
+> write → check compatibility → fix → preview → sync
+
+---
+
+## 定位 / What This Is
+
+本项目是一个 **Claude Code AI 技能（skill）**，以自然语言驱动飞书 Mermaid 图表的完整工作流。  
+底层 CLI 工具作为技能的执行层，也可单独使用。
+
+This project is a **Claude Code AI skill** — you interact with it through natural language in Claude Code conversations. The CLI tools serve as the execution layer and can also be used standalone.
+
+```
+用户（自然语言）→ Claude Code（feishu-preview skill）→ CLI 工具 → 飞书文档
+User (natural language) → Claude Code (feishu-preview skill) → CLI → Feishu doc
+```
+
+**覆盖的完整生命周期 / Full lifecycle covered:**
+
+| 阶段 | 触发词示例 | 执行操作 |
+|---|---|---|
+| ① 检查 | "检查 my-doc.md 飞书兼容性" | 扫描所有 Mermaid 块，报告不兼容语法 |
+| ② 修正 | "自动修正" | 原地修正 `<br/>`、全角 `＜`、`stateDiagram-v2` 等 |
+| ③ 预览 | "预览 my-doc.md" | 生成 HTML，用飞书自家渲染引擎（精确）或 CDN（快速）|
+| ④ 同步 | "同步到飞书" | 通过 lark-cli 推送到飞书文档 |
 
 ---
 
 ## 快速上手 / Quick Start
 
+### 方式一：作为 Claude Code 技能（推荐）
+
 ```bash
-# 克隆后立即预览演示文件（无需任何安装）
-# Clone and preview the demo — no install needed
-git clone https://github.com/your-username/feishu-mermaid-sync.git
-cd feishu-mermaid-sync
-node sync.js preview test/demo-iot-protocol.md
+# 1. 安装 CLI
+npm install -g feishu-preview
+
+# 2. 安装 Claude Code 技能定义
+feishu-preview install-skill
+# → 自动复制 SKILL.md 到 ~/.claude/skills/feishu-preview/
+
+# 3. 在 Claude Code 中用自然语言操作
+# "检查 docs/my-diagram.md 的飞书兼容性"
+# "预览 docs/my-diagram.md"
+# "同步 docs/my-diagram.md 到飞书文档"
 ```
 
-浏览器自动打开，30 秒内看到 8 种图表类型的渲染结果。
+### 方式二：直接使用 CLI
 
-Browser opens automatically. See 8 diagram types rendered in under 30 seconds.
+```bash
+npm install -g feishu-preview
 
----
+feishu-preview check   docs/my-diagram.md      # 检查兼容性
+feishu-preview convert docs/my-diagram.md -w   # 自动修正源文件
+feishu-preview preview docs/my-diagram.md      # 本地预览（精确模式）
+feishu-preview preview docs/my-diagram.md --fast  # 快速预览
+```
 
-## 这是什么 / What It Does
+### 方式三：不安装，克隆后直接用
 
-本工具解决飞书 Mermaid 工作流的三个核心痛点：
-
-This tool solves three core pain points in the Feishu Mermaid workflow:
-
-1. **飞书语法不兼容** — `feishu-compat.js` 自动修正所有已知差异（`<br/>`、全角 `＜`、`stateDiagram-v2` 降级等）
-   **Feishu syntax incompatibility** — `feishu-compat.js` auto-fixes all known differences
-
-2. **本地预览与飞书效果不一致** — 预览时应用相同兼容转换，使用飞书自家渲染引擎（accurate 模式）或 Mermaid v10 CDN（fast 模式）
-   **Local preview doesn't match Feishu** — same compat rules applied at preview time; accurate mode uses Feishu's own engine
-
-3. **反复盲改成本高** — 先预览确认，再引导式推送（dry-run 默认开启）
-   **Blind API edits waste time** — preview first, then guided push with dry-run by default
-
-**核心原则 / Core principle:** 本地 `.md` 文件是唯一可编辑源，飞书文档是只读展示层。
-Local `.md` file is the single source of truth; Feishu document is a read-only display layer.
+```bash
+git clone https://github.com/andyliu/feishu-preview.git
+cd feishu-preview
+node sync.js preview test/demo-iot-protocol.md
+```
 
 ---
 
 ## 环境要求 / Requirements
 
-| 依赖 / Dependency | 用途 / Purpose | 安装 / Install |
+| 依赖 | 用途 | 安装 |
 |---|---|---|
-| Node.js ≥ 16 | 运行所有脚本 / Run all scripts | [nodejs.org](https://nodejs.org) |
-| `@larksuite/whiteboard-cli` | accurate 预览模式（npx 自动拉取）/ accurate preview mode (auto via npx) | 无需手动安装 / auto-installed |
-| `lark-cli` | 飞书同步（仅 push 子命令需要）/ Feishu sync (push only) | `npm install -g @larksuite/lark-cli` |
+| Node.js ≥ 16 | 运行所有脚本 | [nodejs.org](https://nodejs.org) |
+| Claude Code | 技能宿主（方式一） | [claude.ai/code](https://claude.ai/code) |
+| `@larksuite/whiteboard-cli` | accurate 预览模式（npx 自动拉取） | 无需手动安装 |
+| `lark-cli` | 飞书同步（仅 push 需要） | `npm install -g @larksuite/lark-cli` |
 
-零 npm 依赖——除上述两个飞书官方工具外，只用 Node.js 内置模块。
-
-Zero npm dependencies — only Node.js built-ins, plus the two official Feishu tools above.
+零 npm 运行时依赖——仅用 Node.js 内置模块，加上两个飞书官方工具。
 
 ---
 
-## 命令参考 / Commands Reference
+## 命令参考 / CLI Reference
 
-### `preview` — 本地预览 / Local Preview
+### `check` — 检查兼容性
 
 ```bash
-node sync.js preview <file.md> [--fast]
+feishu-preview check <file.md>
 ```
 
-生成 `.preview.html` 并自动用浏览器打开。
+扫描所有 Mermaid 代码块，报告飞书不兼容项（exit 0 = 通过，exit 1 = 有问题）。  
+不修改任何文件。适合写完图表后立即调用。
 
-Generates `.preview.html` and opens it in your browser automatically.
+---
 
-**两种预览模式 / Two preview modes:**
+### `convert` — 飞书兼容转换
 
-| 模式 / Mode | 命令 / Command | 渲染引擎 / Engine | 特点 / Notes |
-|---|---|---|---|
-| **accurate**（默认 / default） | `node sync.js preview file.md` | `@larksuite/whiteboard-cli` 将每张图渲染为 PNG（飞书自家引擎）/ renders each diagram as PNG via Feishu's own engine | 与飞书实际效果最接近；首次需联网下载 whiteboard-cli / Closest to Feishu output; requires network on first run |
-| **fast** | `node sync.js preview file.md --fast` | Mermaid.js v10 CDN，交互式 SVG / Mermaid.js v10 CDN, interactive SVG | 即时渲染，可交互，图表细节可能与飞书有出入 / Instant, interactive; minor layout differences possible |
+```bash
+feishu-preview convert <file.md> -w          # 原地修正源文件
+feishu-preview convert <file.md> -o out.md   # 输出到新文件
+```
+
+自动修正所有已知不兼容项，打印修改摘要。无修改时报告 `✅ 无需修改`。
+
+---
+
+### `preview` — 本地预览
+
+```bash
+feishu-preview preview <file.md>          # 精确模式（默认）
+feishu-preview preview <file.md> --fast   # 快速模式
+```
+
+生成 `.preview.html` 并自动在浏览器打开。
+
+| 模式 | 渲染引擎 | 特点 |
+|---|---|---|
+| **accurate**（默认） | `@larksuite/whiteboard-cli` PNG | 与飞书实际效果最接近；首次需联网 |
+| **fast** | Mermaid.js v10 CDN，交互 SVG | 即时渲染，可交互；细节可能有出入 |
 
 > accurate 模式：PNG 以 base64 内嵌 HTML，可离线分享。
-> Accurate mode: PNGs are base64-embedded in the HTML, shareable offline.
 
 ---
 
-### `convert` — 飞书兼容转换 / Feishu Compatibility Conversion
+### `status` — 查看同步状态
 
 ```bash
-node sync.js convert <file.md> [-o output.md]
+feishu-preview status <file.md>
 ```
 
-对所有 ` ```mermaid ``` ` 代码块应用兼容规则，不修改源文件（除非加 `-w`）。
-输出修改摘要；无修改时报告 `✅ 无需修改`。
-
-Applies compat rules to all ` ```mermaid ``` ` blocks; never touches the source file (unless `-w` is passed).
-Prints a change summary; reports `✅ No changes needed` if nothing to fix.
+读取同目录的 `.feishu-index.json`，显示文档 URL、whiteboard tokens、上次同步时间。
 
 ---
 
-### `status` — 查看同步状态 / Show Sync State
+### `install-skill` — 安装 Claude Code 技能
 
 ```bash
-node sync.js status <file.md>
+feishu-preview install-skill
 ```
 
-读取同目录的 `.feishu-index.json`，显示文档 URL、whiteboard token、上次同步时间。
-
-Reads `.feishu-index.json` in the same directory and shows doc URL, whiteboard token, last sync timestamp.
+复制 `SKILL.md` 到 `~/.claude/skills/feishu-preview/SKILL.md`，使技能在所有项目中可用。
 
 ---
 
-### `push` — 引导式推送 / Guided Push
-
-```bash
-node sync.js push <file.md> --doc-url https://your-org.feishu.cn/docx/Xxxxx
-```
-
-引导完成以下步骤，每步打印对应 lark-cli 命令（dry-run 版），由你确认后执行：
-
-Guides you through these steps, printing the corresponding lark-cli command (dry-run version) at each step for your confirmation:
-
-1. 生成本地预览（视觉确认）/ Generate local preview (visual check)
-2. 飞书兼容转换（写入临时文件）/ Apply feishu-compat (writes to temp file)
-3. 读取飞书文档当前状态 / Fetch current Feishu document state
-4. 检测已有 whiteboard token / Detect existing whiteboard token
-5. 打印推荐的更新命令（dry-run）/ Print recommended update command (dry-run)
-6. 更新 `.feishu-index.json` / Update `.feishu-index.json`
-
----
-
-## 飞书兼容性转换表 / Feishu Compatibility Conversions
+## 飞书兼容性转换表 / Compatibility Conversions
 
 `feishu-compat.js` 处理的所有已知差异：
 
-All known incompatibilities handled by `feishu-compat.js`:
-
-| 问题 / Issue | 原始 / Before | 转换后 / After | 说明 / Notes |
+| 问题 | 原始 | 转换后 | 说明 |
 |---|---|---|---|
-| 换行符 / Line break | `<br/>` | `<br>` | 飞书不接受自闭合 / Feishu rejects self-closing |
-| Note 内裸 `<` / Bare `<` in Note | `x < 300s` | `x ＜ 300s` | 全角；`&lt;` 同样无效 / Fullwidth; `&lt;` also broken |
-| `stateDiagram-v2` | `stateDiagram-v2` | `stateDiagram` | 飞书不支持 v2 / Feishu doesn't support v2 |
-| 多行引用块 / Multi-line blockquote | `> l1\n> l2` | `> l1<br>l2` | 合并为单行 / Merged to single line |
-| 节点双引号 / Node double-quotes | `A["text"]` | 保持 / kept as-is | 单引号反而报错 / Single quotes break Feishu |
+| 换行符 | `<br/>` | `<br>` | 飞书不接受自闭合 |
+| Note 内裸 `<` | `x < 300s` | `x ＜ 300s` | 全角；`&lt;` 同样无效 |
+| `stateDiagram-v2` | `stateDiagram-v2` | `stateDiagram` | 飞书不支持 v2 |
+| 多行引用块 | `> l1\n> l2` | `> l1<br>l2` | 合并为单行 |
+| 节点双引号 | `A["text"]` | 保持不变 | 单引号反而报错 |
 
 ---
 
-## `.feishu-index.json` 格式 / Format
+## `.feishu-index.json` 格式
 
 存放于 `.md` 文件同目录，记录同步状态。**已加入 `.gitignore`，不要提交。**
 
-Stored in the same directory as the `.md` file. **Already in `.gitignore` — do not commit.**
-
 ```json
 {
-  "your-doc.md": {
+  "my-diagram.md": {
     "doc_url": "https://your-org.feishu.cn/docx/Xxxxx",
-    "diagram_title": "## 图表章节标题 / Diagram section heading",
-    "whiteboard_token": "S3xxxxxxxxxx",
-    "last_synced": "2026-04-20T10:00:00Z"
+    "last_synced": "2026-04-20T10:00:00Z",
+    "whiteboards": {
+      "2.1 注册时序图": "FY0FwuSKShMWuZbMjX0czKk6nLh",
+      "3.1 加密流程图": "ARJXwDxhchVthfblGrCcH5jmnfc"
+    }
   }
 }
 ```
-
-| 字段 / Field | 说明 / Description |
-|---|---|
-| `doc_url` | 飞书文档 URL / Feishu document URL |
-| `diagram_title` | 图表前的标题行，用于 `--selection-by-title` 定位 / Heading before the diagram, used for `--selection-by-title` |
-| `whiteboard_token` | 首次推送后从飞书获取 / Obtained from Feishu after first push |
-| `last_synced` | ISO 时间戳 / ISO timestamp |
 
 ---
 
 ## 项目结构 / Project Structure
 
 ```
-feishu-mermaid-sync/
-├── sync.js                     # 统一入口 / Unified entry point
-├── render-preview.js           # Markdown → HTML 预览 / Markdown → HTML preview
-├── feishu-compat.js            # Mermaid 飞书兼容转换 / Mermaid compatibility converter
-├── SKILL.md                    # Claude Code AI agent skill 定义 / skill definition
-├── .feishu-index.json          # 同步状态记录（gitignored）/ Sync state (gitignored)
+feishu-preview/
+├── sync.js              # CLI 入口（feishu-preview 命令）
+├── render-preview.js    # Markdown → HTML 预览
+├── feishu-compat.js     # Mermaid 飞书兼容转换
+├── SKILL.md             # Claude Code 技能定义（install-skill 会复制到 ~/.claude/skills/）
+├── package.json
 ├── .gitignore
 ├── README.md
 └── test/
-    └── demo-iot-protocol.md    # 中英双语演示文档，覆盖 8 种图表类型
-                                # Bilingual demo document with 8 diagram types
+    └── demo-iot-protocol.md   # 中英双语演示文档，覆盖 8 种图表类型
 ```
 
 ---
 
 ## 常见问题 / FAQ
 
-**Q: 预览时图表空白或报错，怎么办？**
-**Q: Diagram is blank or shows an error in preview — what do I do?**
+**Q: 预览时图表空白或报错？**
 
-A: accurate 模式下，错误会显示红色错误框和转换后的源码。切换 `--fast` 模式可快速排查语法问题，因为 fast 模式会在浏览器控制台输出详细的 Mermaid 错误。
-
-In accurate mode, a red error box appears with the converted source. Switch to `--fast` for quick syntax debugging — the browser console shows detailed Mermaid errors.
+accurate 模式下，错误会显示红色错误框和转换后的源码。切换 `--fast` 模式可快速排查——浏览器控制台有详细 Mermaid 错误信息。
 
 ---
 
-**Q: `stateDiagram-v2` 转为 `stateDiagram` 后功能会丢失吗？**
-**Q: Does downgrading `stateDiagram-v2` to `stateDiagram` lose functionality?**
+**Q: Claude Code 技能安装后在哪里触发？**
 
-A: 对绝大多数图表无影响。`stateDiagram-v2` 是 Mermaid 内部引用两种不同布局引擎的写法，飞书只支持旧版引擎，但常用语法（状态、转换、note、并发）均兼容。
+在 Claude Code 对话中说出触发词即可，例如：
+- "检查这个 markdown 的飞书兼容性"
+- "预览 docs/diagram.md"
+- "把这个文档同步到飞书"
 
-No impact for most diagrams. `stateDiagram-v2` references a different internal layout engine. Feishu only supports the older engine, but all common syntax (states, transitions, notes, concurrency) is compatible.
-
----
-
-**Q: 推送后想修改图表，怎么操作？**
-**Q: I pushed a diagram and want to update it — how?**
-
-A: 修改本地 `.md` 文件 → `node sync.js preview` 确认 → `node sync.js convert` 生成兼容版 → 用 `.feishu-index.json` 中的 `whiteboard_token` 执行 `lark-cli docs +whiteboard-update --overwrite`（先加 `--dry-run`）。**永远不要在飞书 Whiteboard 编辑器里直接改 Mermaid 内容**——无法导出回源码。
-
-Edit the local `.md` → `node sync.js preview` to confirm → `node sync.js convert` to generate compat version → use the `whiteboard_token` from `.feishu-index.json` with `lark-cli docs +whiteboard-update --overwrite` (add `--dry-run` first). **Never edit Mermaid content directly in Feishu's Whiteboard editor** — there is no way to export it back to source.
+技能定义文件在 `~/.claude/skills/feishu-preview/SKILL.md`，可手动编辑触发词。
 
 ---
 
 **Q: 工具会修改我的源文件吗？**
-**Q: Will this tool modify my source `.md` file?**
 
-A: 不会。`convert` 和 `push` 默认写入临时文件或 `-o` 指定的输出路径。只有显式传 `-w` 标志时才原地修改源文件。
+不会，除非显式传 `-w`。`check` 只读，`convert` 默认输出到新文件。
 
-No. `convert` and `push` write to a temp file or the path specified by `-o` by default. The source file is only modified in-place when you explicitly pass the `-w` flag.
+---
+
+**Q: 推送后想更新图表怎么操作？**
+
+修改本地 `.md` → `feishu-preview check` → `feishu-preview convert -w` → `feishu-preview preview` 确认 → 在 Claude Code 中说"同步到飞书"。
+
+**永远不要在飞书 Whiteboard 编辑器里直接改 Mermaid 内容**——无法导出回源码。
 
 ---
 
