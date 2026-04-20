@@ -27,11 +27,9 @@
 
 ---
 
-## 快速上手（5 分钟）
+## 快速上手（2 步）
 
-### 第一步：安装
-
-**方式 A：Claude Code 插件（推荐，自动更新）**
+### 第一步：安装插件
 
 在 Claude Code 里运行：
 
@@ -39,33 +37,15 @@
 /plugin marketplace add andyliu/feishu-preview
 ```
 
-插件会自动安装 CLI 工具和 Claude Code 技能定义，后续版本更新也是自动的。
+CLI 工具和 Claude Code 技能定义一并安装，后续版本更新自动完成，无需手动操作。
 
-**方式 B：npm 全局安装**
+> 需要 Node.js ≥ 16。没有的话先去 [nodejs.org](https://nodejs.org) 下载安装。
 
-```bash
-npm install -g feishu-preview
-```
+### 第二步：使用
 
-> 需要 Node.js ≥ 16，没有的话先去 [nodejs.org](https://nodejs.org) 下载安装。
+**Claude Code 自然语言（推荐）**
 
-### 第二步：安装 Claude Code 技能（仅 npm 安装时需要）
-
-如果通过 npm 安装，需要手动安装技能定义：
-
-```bash
-feishu-preview install-skill
-```
-
-这会把技能定义文件复制到 `~/.claude/skills/feishu-preview/SKILL.md`，之后在 Claude Code 里直接用自然语言操作。
-
-> 使用 Claude Code 插件安装时，技能会自动注册，无需此步骤。
-
-### 第三步：使用
-
-**方式 A：Claude Code 自然语言（推荐）**
-
-安装技能后，在 Claude Code 对话里直接说：
+安装后，在 Claude Code 对话里直接说：
 
 ```
 检查 docs/my-diagram.md 的飞书兼容性
@@ -75,19 +55,19 @@ feishu-preview install-skill
 
 Claude Code 会自动调用工具，引导你完成每一步。
 
-**方式 B：CLI 命令**
+**CLI 命令（直接调用）**
 
 ```bash
-# 1. 写完图表后，检查是否有飞书不兼容的语法
+# 写完图表后，检查飞书兼容性
 feishu-preview check docs/my-diagram.md
 
-# 2. 发现问题？一键自动修正源文件
+# 发现问题？一键自动修正
 feishu-preview convert docs/my-diagram.md -w
 
-# 3. 生成本地预览，效果与飞书完全一致
+# 生成本地精确预览（与飞书渲染一致）
 feishu-preview preview docs/my-diagram.md
 
-# 4. 查看飞书同步状态
+# 查看飞书同步状态
 feishu-preview status docs/my-diagram.md
 ```
 
@@ -158,8 +138,8 @@ feishu-preview status docs/my-diagram.md
 | 依赖 | 用途 | 安装方式 |
 |---|---|---|
 | Node.js ≥ 16 | 运行所有脚本 | [nodejs.org](https://nodejs.org) |
-| Claude Code | 使用自然语言技能（可选） | [claude.ai/code](https://claude.ai/code) |
-| `feishu-preview` | 本工具 | `/plugin marketplace add andyliu/feishu-preview` 或 `npm install -g feishu-preview` |
+| Claude Code | 使用自然语言技能 | [claude.ai/code](https://claude.ai/code) |
+| `feishu-preview` | 本工具 | `/plugin marketplace add andyliu/feishu-preview` |
 | `@larksuite/whiteboard-cli` | 精确预览模式（npx 自动拉取） | 无需手动安装 |
 | `lark-cli` | 飞书文档同步（仅推送时需要） | `npm install -g @larksuite/lark-cli` |
 
@@ -186,6 +166,77 @@ feishu-preview/
 │               └── SKILL.md     # Claude Code 技能定义
 └── package.json
 ```
+
+---
+
+## 最佳实践
+
+### 目录结构
+
+把图表文档放在独立目录，便于管理 `.feishu-index.json`：
+
+```
+docs/
+└── diagrams/
+    ├── device-flow.md          # 源文件（含 Mermaid，这是唯一可编辑的地方）
+    ├── device-flow.preview.html  # 自动生成，gitignore，勿提交
+    └── .feishu-index.json        # 记录飞书 token，gitignore，勿提交
+```
+
+### 标准工作流
+
+每次修改图表后，按以下顺序执行，不要跳步：
+
+```
+1. 编写/修改 Mermaid 代码
+2. feishu-preview check    → 检查兼容性
+3. feishu-preview convert -w  → 有问题则修正
+4. feishu-preview preview  → 精确预览确认效果（必须，同步前最后防线）
+5. 告诉 Claude Code "同步到飞书"
+```
+
+### 本地 .md 是唯一真相来源
+
+- **永远不要在飞书 Whiteboard 编辑器里直接修改 Mermaid**——飞书不提供导出功能，修改后将无法同步回本地，等于丢失版本控制
+- 所有修改都在本地 `.md` 文件进行，飞书文档只是展示层
+
+### Git 提交规范
+
+```bash
+# ✅ 应该提交
+git add docs/diagrams/device-flow.md
+
+# ❌ 不要提交（已在 .gitignore）
+# docs/diagrams/device-flow.preview.html
+# docs/diagrams/.feishu-index.json
+```
+
+### 每个 H2 标题对应一个图表
+
+飞书 whiteboard 以标题为锚点定位，建议每张图表前保留清晰的 H2 标题，便于迭代更新时精确定位：
+
+```markdown
+## 2.1 设备注册时序
+
+```mermaid
+sequenceDiagram
+    ...
+```
+
+## 3.1 密钥派生流程
+
+```mermaid
+flowchart TD
+    ...
+```
+```
+
+### 精确预览 vs 调试模式
+
+| 场景 | 命令 |
+|---|---|
+| 同步前的最终视觉确认 | `feishu-preview preview file.md`（精确模式，必须） |
+| 图表报错，需要看详细报错信息 | `feishu-preview preview file.md --fast`（调试专用，结果不代表飞书效果） |
 
 ---
 
@@ -242,11 +293,9 @@ This tool uses **Feishu's own official `whiteboard-cli` rendering engine** for l
 
 ---
 
-## Quick Start (5 minutes)
+## Quick Start (2 steps)
 
-### Step 1: Install
-
-**Option A: Claude Code Plugin (recommended — auto-updates)**
+### Step 1: Install the Plugin
 
 In Claude Code, run:
 
@@ -254,34 +303,16 @@ In Claude Code, run:
 /plugin marketplace add andyliu/feishu-preview
 ```
 
-This installs both the CLI and the Claude Code skill definition automatically.
-Future updates are applied at startup — no manual reinstall needed.
-
-**Option B: npm global install**
-
-```bash
-npm install -g feishu-preview
-```
+This installs both the CLI and the Claude Code skill definition in one step.
+Future updates are applied automatically at startup — no manual reinstall needed.
 
 > Requires Node.js ≥ 16. Download from [nodejs.org](https://nodejs.org) if needed.
 
-### Step 2: Install the Claude Code Skill (npm install only)
+### Step 2: Use It
 
-If you installed via npm, register the skill manually:
+**Claude Code natural language (recommended)**
 
-```bash
-feishu-preview install-skill
-```
-
-This copies the skill definition to `~/.claude/skills/feishu-preview/SKILL.md`, enabling natural language control from Claude Code.
-
-> If you used the Claude Code plugin, the skill is registered automatically — skip this step.
-
-### Step 3: Use It
-
-**Option A: Claude Code natural language (recommended)**
-
-After installing the skill, just talk to Claude Code:
+Just talk to Claude Code:
 
 ```
 Check docs/my-diagram.md for Feishu compatibility
@@ -291,19 +322,19 @@ Sync docs/my-diagram.md to Feishu
 
 Claude Code will call the tools automatically and guide you through each step.
 
-**Option B: CLI commands**
+**CLI commands (direct use)**
 
 ```bash
-# 1. After writing diagrams, check for Feishu-incompatible syntax
+# Check for Feishu-incompatible syntax after writing
 feishu-preview check docs/my-diagram.md
 
-# 2. Issues found? Auto-fix the source file
+# Issues found? Auto-fix in-place
 feishu-preview convert docs/my-diagram.md -w
 
-# 3. Generate a local preview — renders exactly like Feishu
+# Generate accurate local preview (same engine as Feishu)
 feishu-preview preview docs/my-diagram.md
 
-# 4. View Feishu sync status
+# View sync status
 feishu-preview status docs/my-diagram.md
 ```
 
@@ -374,8 +405,8 @@ After syncing to Feishu, the tool writes `.feishu-index.json` alongside your `.m
 | Dependency | Purpose | Install |
 |---|---|---|
 | Node.js ≥ 16 | Run all scripts | [nodejs.org](https://nodejs.org) |
-| Claude Code | Natural language skill interface (optional) | [claude.ai/code](https://claude.ai/code) |
-| `feishu-preview` | This tool | `/plugin marketplace add andyliu/feishu-preview` or `npm install -g feishu-preview` |
+| Claude Code | Natural language skill interface | [claude.ai/code](https://claude.ai/code) |
+| `feishu-preview` | This tool | `/plugin marketplace add andyliu/feishu-preview` |
 | `@larksuite/whiteboard-cli` | Accurate preview mode (auto-fetched via npx) | Not needed manually |
 | `lark-cli` | Feishu document sync (push only) | `npm install -g @larksuite/lark-cli` |
 
@@ -402,6 +433,77 @@ feishu-preview/
 │               └── SKILL.md       # Claude Code skill definition
 └── package.json
 ```
+
+---
+
+## Best Practices
+
+### Directory Layout
+
+Keep diagram documents in a dedicated directory so `.feishu-index.json` is co-located:
+
+```
+docs/
+└── diagrams/
+    ├── device-flow.md            # Source file — the only place you edit Mermaid
+    ├── device-flow.preview.html  # Auto-generated, gitignored, do not commit
+    └── .feishu-index.json        # Feishu whiteboard tokens, gitignored, do not commit
+```
+
+### Standard Workflow — Never Skip Steps
+
+Every time you edit a diagram, follow this order without skipping:
+
+```
+1. Write / edit Mermaid code in the .md file
+2. feishu-preview check      → detect compatibility issues
+3. feishu-preview convert -w → auto-fix issues if any
+4. feishu-preview preview    → accurate visual verification (required — last check before sync)
+5. Tell Claude Code "sync to Feishu"
+```
+
+### Local .md Is the Single Source of Truth
+
+- **Never edit Mermaid content directly in Feishu's Whiteboard editor** — Feishu provides no export function, so any change made there cannot be synced back. You lose version control permanently.
+- All edits happen in the local `.md` file. Feishu is display-only.
+
+### Git Hygiene
+
+```bash
+# ✅ Commit this
+git add docs/diagrams/device-flow.md
+
+# ❌ Do not commit (already in .gitignore)
+# docs/diagrams/device-flow.preview.html
+# docs/diagrams/.feishu-index.json
+```
+
+### One H2 Heading Per Diagram
+
+Feishu uses headings as anchors for whiteboard placement. Keep a clear H2 heading before each diagram to enable precise iterative updates:
+
+```markdown
+## 2.1 Device Registration Sequence
+
+```mermaid
+sequenceDiagram
+    ...
+```
+
+## 3.1 Key Derivation Flow
+
+```mermaid
+flowchart TD
+    ...
+```
+```
+
+### Accurate Mode vs Debug Mode
+
+| When | Command |
+|---|---|
+| Final visual verification before sync | `feishu-preview preview file.md` (accurate — required) |
+| Diagram fails to render, need parse error details | `feishu-preview preview file.md --fast` (debug only — output does not represent Feishu) |
 
 ---
 
