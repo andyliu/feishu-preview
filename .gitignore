@@ -16,6 +16,9 @@
 node_modules/
 package-lock.json
 
+# Test / demo files (internal content)
+test/
+
 # Temp render outputs
 output.png
 
