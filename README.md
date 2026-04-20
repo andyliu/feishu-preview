@@ -1,5 +1,10 @@
 # feishu-preview
 
+[![npm version](https://img.shields.io/npm/v/feishu-preview?style=flat-square&color=cb3837)](https://www.npmjs.com/package/feishu-preview)
+[![GitHub release](https://img.shields.io/github/v/release/andyliu/feishu-preview?style=flat-square&color=238636)](https://github.com/andyliu/feishu-preview/releases)
+[![License](https://img.shields.io/npm/l/feishu-preview?style=flat-square&color=6e7681)](https://github.com/andyliu/feishu-preview/blob/master/LICENSE)
+[![Node.js](https://img.shields.io/node/v/feishu-preview?style=flat-square&color=339933)](https://nodejs.org)
+
 **语言 / Language:** [中文](#中文) | [English](#english)
 
 ---
