@@ -1,0 +1,24 @@
+# Preview outputs (auto-generated)
+*.preview.html
+
+# Feishu sync index (contains doc URLs and tokens — keep locally, don't commit)
+.feishu-index.json
+
+# Temp conversion files
+*.feishu.md
+
+# Test files with proprietary/internal content
+# Add your own test files here if they contain sensitive information:
+# test/internal-*.md
+# test/confidential-*.md
+
+# Node (if you ever add packages)
+node_modules/
+package-lock.json
+
+# Temp render outputs
+output.png
+
+# OS
+.DS_Store
+Thumbs.db
