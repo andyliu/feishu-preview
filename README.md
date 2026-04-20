@@ -102,7 +102,7 @@ feishu-preview status docs/my-diagram.md
 | `feishu-preview convert <file> -w` | 原地修正源文件中所有不兼容语法 |
 | `feishu-preview convert <file> -o out.md` | 修正后输出到新文件（不改源文件） |
 | `feishu-preview preview <file>` | 精确预览：用飞书官方引擎渲染为 PNG（默认） |
-| `feishu-preview preview <file> --fast` | 快速预览：Mermaid CDN 交互 SVG，即时渲染 |
+| `feishu-preview preview <file> --fast` | **仅语法调试**：Mermaid CDN 渲染，结果与飞书不符，不可用于视觉验证 |
 | `feishu-preview status <file>` | 查看 `.feishu-index.json` 中的同步状态 |
 
 ---
@@ -111,8 +111,8 @@ feishu-preview status docs/my-diagram.md
 
 | 模式 | 命令 | 渲染引擎 | 特点 |
 |---|---|---|---|
-| **精确模式**（默认） | `feishu-preview preview file.md` | `@larksuite/whiteboard-cli`，每张图渲染为 PNG | 与飞书实际效果完全一致；首次运行需联网下载 |
-| **快速模式** | `feishu-preview preview file.md --fast` | Mermaid.js v10 CDN，交互式 SVG | 秒级渲染，可交互；个别样式与飞书有细微差异 |
+| **精确模式**（默认） | `feishu-preview preview file.md` | `@larksuite/whiteboard-cli`，每张图渲染为 PNG | 与飞书实际效果完全一致；**同步前必须用此模式确认**；首次运行需联网下载 |
+| **调试模式**（`--fast`，⚠️ 非视觉验证） | `feishu-preview preview file.md --fast` | Mermaid.js v10 CDN，交互式 SVG | **仅用于排查 Mermaid 语法错误**（浏览器控制台显示详细报错）；渲染引擎与飞书不同，结果不可作为视觉依据 |
 
 精确模式生成的 HTML 中，PNG 以 base64 内嵌，可离线分享。
 
@@ -318,7 +318,7 @@ feishu-preview status docs/my-diagram.md
 | `feishu-preview convert <file> -w` | Fix all incompatible syntax in-place |
 | `feishu-preview convert <file> -o out.md` | Fix and write to a new file (source unchanged) |
 | `feishu-preview preview <file>` | Accurate preview: render via Feishu's own engine (default) |
-| `feishu-preview preview <file> --fast` | Fast preview: Mermaid CDN interactive SVG |
+| `feishu-preview preview <file> --fast` | **Syntax debug only**: Mermaid CDN render — output does NOT match Feishu, not for visual verification |
 | `feishu-preview status <file>` | Show sync state from `.feishu-index.json` |
 
 ---
@@ -327,8 +327,8 @@ feishu-preview status docs/my-diagram.md
 
 | Mode | Command | Engine | Notes |
 |---|---|---|---|
-| **Accurate** (default) | `feishu-preview preview file.md` | `@larksuite/whiteboard-cli`, renders each diagram as PNG | Matches Feishu exactly; requires network on first run |
-| **Fast** | `feishu-preview preview file.md --fast` | Mermaid.js v10 CDN, interactive SVG | Instant rendering; minor style differences possible |
+| **Accurate** (default) | `feishu-preview preview file.md` | `@larksuite/whiteboard-cli`, renders each diagram as PNG | Matches Feishu exactly; **required before syncing**; network needed on first run |
+| **Debug** (`--fast`, ⚠️ not for visual verification) | `feishu-preview preview file.md --fast` | Mermaid.js v10 CDN, interactive SVG | **Syntax debugging only** — browser console shows parse errors; different engine from Feishu, output cannot be used as visual reference |
 
 In accurate mode, PNGs are base64-embedded in the HTML output — shareable offline.
 
