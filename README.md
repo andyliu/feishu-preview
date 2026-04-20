@@ -196,7 +196,7 @@ docs/
 ```
 1. 编写/修改 Mermaid 代码
 2. feishu-preview check    → 检查兼容性
-3. feishu-preview convert -w  → 有问题则修正
+3. feishu-preview convert -w → 有问题则修正
 4. feishu-preview preview  → 精确预览确认效果（必须，同步前最后防线）
 5. 告诉 Claude Code "同步到飞书"
 ```
@@ -221,14 +221,14 @@ git add docs/diagrams/device-flow.md
 
 飞书 whiteboard 以标题为锚点定位，建议每张图表前保留清晰的 H2 标题，便于迭代更新时精确定位：
 
-```markdown
+````markdown
 ## 2.1 设备注册时序
 
 ```mermaid
 sequenceDiagram
     ...
 ```
-```
+````
 
 ### 精确预览 vs 调试模式
 
@@ -480,14 +480,14 @@ git add docs/diagrams/device-flow.md
 
 Feishu uses headings as anchors for whiteboard placement. Keep a clear H2 heading before each diagram to enable precise iterative updates:
 
-```markdown
+````markdown
 ## 2.1 Device Registration Sequence
 
 ```mermaid
 sequenceDiagram
     ...
 ```
-```
+````
 
 ### Accurate Mode vs Debug Mode
 
@@ -524,8 +524,3 @@ No impact for most diagrams. The two variants use different internal layout engi
 
 [⬆ Back to top](#feishu-preview) | [← 中文](#中文)
 
----
-
-## License
-
-MIT
