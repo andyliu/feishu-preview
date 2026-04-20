@@ -263,5 +263,9 @@ Values are whiteboard tokens from `lark-cli docs +fetch --format json`.
    Fast mode uses Mermaid.js v10 — visually different for some diagram types.
 
 **`feishu-preview` command not found?**
-→ Install: `npm install -g feishu-preview`
-   Or add plugin: `/plugin marketplace add andyliu/feishu-preview`
+→ Install via Claude Code plugin: `/plugin marketplace add andyliu/feishu-preview`
+   Then run: `feishu-preview doctor` to set up all dependencies interactively.
+
+**`lark-cli` not found or sync fails with "command not found"?**
+→ Run `feishu-preview doctor` — it will detect missing dependencies and prompt to install them,
+   including running `lark-cli auth login` for Feishu account authorization.

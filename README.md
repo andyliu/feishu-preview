@@ -41,6 +41,12 @@ CLI 工具和 Claude Code 技能定义一并安装，后续版本更新自动完
 
 > 需要 Node.js ≥ 16。没有的话先去 [nodejs.org](https://nodejs.org) 下载安装。
 
+安装后运行一次依赖检查，工具会自动检测并引导安装 `lark-cli` 等依赖：
+
+```bash
+feishu-preview doctor
+```
+
 ### 第二步：使用
 
 **Claude Code 自然语言（推荐）**
@@ -77,6 +83,7 @@ feishu-preview status docs/my-diagram.md
 
 | 命令 | 说明 |
 |---|---|
+| `feishu-preview doctor` | 检查并安装所有必要依赖（lark-cli 等），交互式引导 |
 | `feishu-preview install-skill` | 安装 Claude Code 技能定义到 `~/.claude/skills/` |
 | `feishu-preview check <file>` | 检查飞书兼容性，只读，exit 1 表示有问题 |
 | `feishu-preview convert <file> -w` | 原地修正源文件中所有不兼容语法 |
@@ -308,6 +315,12 @@ Future updates are applied automatically at startup — no manual reinstall need
 
 > Requires Node.js ≥ 16. Download from [nodejs.org](https://nodejs.org) if needed.
 
+After installing, run the dependency checker once. It detects missing tools (like `lark-cli`) and walks you through installing them:
+
+```bash
+feishu-preview doctor
+```
+
 ### Step 2: Use It
 
 **Claude Code natural language (recommended)**
@@ -344,6 +357,7 @@ feishu-preview status docs/my-diagram.md
 
 | Command | Description |
 |---|---|
+| `feishu-preview doctor` | Check and install required dependencies (lark-cli etc.), interactive guided setup |
 | `feishu-preview install-skill` | Install Claude Code skill to `~/.claude/skills/` |
 | `feishu-preview check <file>` | Check Feishu compatibility (read-only; exit 1 = issues found) |
 | `feishu-preview convert <file> -w` | Fix all incompatible syntax in-place |

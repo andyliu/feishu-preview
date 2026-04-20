@@ -3,33 +3,54 @@
  * feishu-preview — Feishu Mermaid diagram workflow CLI
  *
  * Subcommands:
- *   feishu-preview install-skill                         Install Claude Code skill definition
- *   feishu-preview check   <file>                        Check Feishu compatibility (read-only)
- *   feishu-preview convert <file> [-w] [-o output.md]    Convert to Feishu-compatible format
- *   feishu-preview preview <file> [--fast]               Local preview (accurate mode by default)
- *   feishu-preview status  <file>                        Show sync status from .feishu-index.json
- *   feishu-preview push    <file> --doc-url <url>        Push to Feishu document
+ *   feishu-preview doctor                                  Check and install dependencies
+ *   feishu-preview install-skill                           Install Claude Code skill definition
+ *   feishu-preview check   <file>                          Check Feishu compatibility (read-only)
+ *   feishu-preview convert <file> [-w] [-o output.md]      Convert to Feishu-compatible format
+ *   feishu-preview preview <file> [--fast]                 Local preview (accurate mode by default)
+ *   feishu-preview status  <file>                          Show sync status from .feishu-index.json
+ *   feishu-preview push    <file> --doc-url <url>          Push to Feishu document
  */
 
-const fs = require('fs');
+const fs   = require('fs');
 const path = require('path');
+const readline = require('readline');
 const { execFileSync, spawnSync } = require('child_process');
 
-const BIN_DIR = __dirname;
+const BIN_DIR   = __dirname;
 const INDEX_FILE = '.feishu-index.json';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function askYesNo(question) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise(resolve => {
+    rl.question(question, answer => {
+      rl.close();
+      const a = answer.trim().toLowerCase();
+      resolve(a === '' || a === 'y' || a === 'yes' || a === '是');
+    });
+  });
+}
+
+function cmdExists(cmd) {
+  const checker = process.platform === 'win32' ? 'where' : 'which';
+  return spawnSync(checker, [cmd], { stdio: 'pipe' }).status === 0;
+}
 
 function usage() {
   console.log(`
 Usage: feishu-preview <command> [file] [options]
 
 Commands:
+  doctor                             Check and install required dependencies
   install-skill                      Install Claude Code skill to ~/.claude/skills/
   check   <file>                     Check Feishu compatibility (read-only, exit 1 = issues)
   convert <file> [-o output.md]      Convert to Feishu-compatible format (stdout or new file)
           <file> -w                  Convert and overwrite source file in-place
   preview <file> [--fast]            Generate HTML preview and open in browser
                                        default: whiteboard-cli accurate mode (matches Feishu exactly)
-                                       --fast:  Mermaid.js fast mode (instant, for syntax debugging only)
+                                       --fast:  Mermaid.js mode (syntax debugging only)
   status  <file>                     Show .feishu-index.json sync status
   push    <file> --doc-url <url>     Push to Feishu (requires lark-cli)
 
@@ -42,172 +63,308 @@ Workflow:
   process.exit(1);
 }
 
-const args = process.argv.slice(2);
-const command = args[0];
+// ── Dependency definitions ────────────────────────────────────────────────────
 
-if (!command) usage();
+const DEPS = [
+  {
+    name: 'lark-cli',
+    purpose: '飞书文档同步（push 命令必需）/ Feishu document sync (required for push)',
+    check: () => cmdExists('lark-cli'),
+    install: ['npm', 'install', '-g', '@larksuite/lark-cli'],
+    installDisplay: 'npm install -g @larksuite/lark-cli',
+    postInstallMsg: '安装成功。接下来需要完成飞书账号授权：',
+    authCmd: ['lark-cli', 'auth', 'login'],
+    authDisplay: 'lark-cli auth login',
+    offerAuth: true,
+  },
+  {
+    name: 'npx',
+    purpose: '精确预览模式（whiteboard-cli 自动拉取）/ accurate preview mode',
+    check: () => cmdExists('npx'),
+    install: null,
+    installDisplay: 'npx 随 npm 附带安装，请升级 npm：npm install -g npm',
+    postInstallMsg: null,
+    offerAuth: false,
+  },
+];
 
-// ── install-skill ──────────────────────────────────────────────────────────────
-if (command === 'install-skill') {
-  const os = require('os');
-  const skillsDir = path.join(os.homedir(), '.claude', 'skills', 'feishu-preview');
-  const srcSkill = path.join(BIN_DIR, '..', 'skills', 'feishu-preview', 'SKILL.md');
-  if (!fs.existsSync(srcSkill)) {
-    console.error(`Error: SKILL.md not found at: ${srcSkill}`);
-    process.exit(1);
-  }
-  fs.mkdirSync(skillsDir, { recursive: true });
-  fs.copyFileSync(srcSkill, path.join(skillsDir, 'SKILL.md'));
-  console.log(`✅ Claude Code skill installed`);
-  console.log(`   Location: ${path.join(skillsDir, 'SKILL.md')}`);
-  console.log(`\nIn Claude Code, you can now say:`);
-  console.log(`   "Check my-doc.md for Feishu compatibility"`);
-  console.log(`   "Preview my-doc.md"`);
-  console.log(`   "Sync my-doc.md to Feishu"`);
-  process.exit(0);
-}
+// ── doctor ────────────────────────────────────────────────────────────────────
 
-// Commands below require a <file> argument
-const inputFile = args[1];
-if (!inputFile) usage();
-if (!fs.existsSync(inputFile)) {
-  console.error(`Error: File not found: ${inputFile}`);
-  process.exit(1);
-}
+async function runDoctor(autoMode = false) {
+  console.log('\n🔍 feishu-preview 依赖检查 / Dependency check\n');
 
-const absInput = path.resolve(inputFile);
-const dir = path.dirname(absInput);
-const basename = path.basename(absInput);
-const indexPath = path.join(dir, INDEX_FILE);
+  let allOk = true;
 
-function readIndex() {
-  if (!fs.existsSync(indexPath)) return {};
-  try { return JSON.parse(fs.readFileSync(indexPath, 'utf-8')); }
-  catch (_) { return {}; }
-}
-
-function writeIndex(data) {
-  fs.writeFileSync(indexPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
-}
-
-// ── check ─────────────────────────────────────────────────────────────────────
-if (command === 'check') {
-  const compatScript = path.join(BIN_DIR, 'feishu-compat.js');
-  const result = spawnSync(process.execPath, [compatScript, absInput, '--check'], { stdio: 'inherit' });
-  process.exit(result.status ?? 0);
-}
-
-// ── convert ───────────────────────────────────────────────────────────────────
-if (command === 'convert') {
-  const compatScript = path.join(BIN_DIR, 'feishu-compat.js');
-  const outIdx = args.indexOf('-o');
-  const outputFile = outIdx !== -1 ? args[outIdx + 1] : null;
-  const writeInPlace = args.includes('-w');
-  const extra = outputFile ? ['-o', outputFile] : writeInPlace ? ['-w'] : [];
-  const result = spawnSync(process.execPath, [compatScript, absInput, ...extra], { stdio: 'inherit' });
-  process.exit(result.status ?? 0);
-}
-
-// ── preview ───────────────────────────────────────────────────────────────────
-if (command === 'preview') {
-  const previewScript = path.join(BIN_DIR, 'render-preview.js');
-  const extraFlags = args.filter(a => a.startsWith('--'));
-  const result = spawnSync(process.execPath, [previewScript, absInput, ...extraFlags], { stdio: 'inherit' });
-  process.exit(result.status ?? 0);
-}
-
-// ── status ────────────────────────────────────────────────────────────────────
-if (command === 'status') {
-  const idx = readIndex();
-  const entry = idx[basename];
-  if (!entry) {
-    console.log(`[${basename}] Not found in ${INDEX_FILE} — never synced.`);
-  } else {
-    console.log(`[${basename}] Sync status:`);
-    console.log(`  doc_url:     ${entry.doc_url || '(not recorded)'}`);
-    console.log(`  last_synced: ${entry.last_synced || '(never)'}`);
-    const wbs = entry.whiteboards || {};
-    const wbCount = Object.keys(wbs).length;
-    if (wbCount > 0) {
-      console.log(`  whiteboards: ${wbCount} diagram(s)`);
-      Object.entries(wbs).forEach(([title, token]) => {
-        console.log(`    ${title}: ${token}`);
-      });
+  for (const dep of DEPS) {
+    const ok = dep.check();
+    if (ok) {
+      console.log(`  ✅  ${dep.name}`);
+      continue;
     }
-  }
-  process.exit(0);
-}
 
-// ── push ──────────────────────────────────────────────────────────────────────
-if (command === 'push') {
-  const docUrlIdx = args.indexOf('--doc-url');
-  const docUrl = docUrlIdx !== -1 ? args[docUrlIdx + 1] : null;
+    allOk = false;
+    console.log(`  ❌  ${dep.name} — 未安装 / not installed`);
+    console.log(`       用途: ${dep.purpose}`);
 
-  if (!docUrl) {
-    console.error('Error: push requires --doc-url <url>');
-    process.exit(1);
-  }
+    if (!dep.install) {
+      console.log(`       修复: ${dep.installDisplay}`);
+      continue;
+    }
 
-  const idx = readIndex();
-  const entry = idx[basename] || {};
-  const wbToken = entry.whiteboard_token;
+    const doInstall = autoMode
+      ? true
+      : await askYesNo(`\n  现在安装 ${dep.name}？(Y/n) `);
 
-  console.log(`\n=== feishu-preview push: ${basename} ===\n`);
+    if (!doInstall) {
+      console.log(`  跳过。如需手动安装：${dep.installDisplay}\n`);
+      continue;
+    }
 
-  // Step 1: Local preview
-  console.log('Step 1/4: Generating local preview...');
-  const previewScript = path.join(BIN_DIR, 'render-preview.js');
-  spawnSync(process.execPath, [previewScript, absInput], { stdio: 'inherit' });
-  console.log('Review the preview in your browser, then continue.\n');
-
-  // Step 2: Feishu compatibility conversion
-  console.log('Step 2/4: Converting to Feishu-compatible format...');
-  const tmpFile = path.join(require('os').tmpdir(), `${basename}-feishu.md`);
-  const compatScript = path.join(BIN_DIR, 'feishu-compat.js');
-  spawnSync(process.execPath, [compatScript, absInput, '-o', tmpFile], { stdio: 'inherit' });
-
-  // Step 3: Read current document state
-  console.log('\nStep 3/4: Reading current Feishu document state...');
-  console.log(`  lark-cli docs +fetch --doc "${docUrl}" --format json\n`);
-  try {
-    const fetchOut = execFileSync('lark-cli', ['docs', '+fetch', '--doc', docUrl, '--format', 'json'], {
-      encoding: 'utf-8',
+    console.log(`\n  正在安装 ${dep.name}...\n`);
+    const r = spawnSync(dep.install[0], dep.install.slice(1), {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
     });
-    const doc = JSON.parse(fetchOut);
-    const wbTokens = extractWhiteboardTokens(doc);
-    if (wbTokens.length > 0) {
-      console.log('  Found whiteboard block token(s):');
-      wbTokens.forEach(t => console.log(`    - ${t}`));
-    } else {
-      console.log('  No whiteboard blocks found (no Mermaid diagrams in document yet).');
+
+    if (r.status !== 0) {
+      console.log(`\n  ❌ 安装失败，请手动运行：${dep.installDisplay}`);
+      continue;
     }
-  } catch (e) {
-    console.error(`  Warning: lark-cli +fetch failed: ${e.message}`);
+
+    console.log(`\n  ✅ ${dep.name} 安装成功`);
+    allOk = true;
+
+    if (dep.offerAuth && dep.authCmd) {
+      if (dep.postInstallMsg) console.log(`\n  ${dep.postInstallMsg}`);
+      console.log(`  命令: ${dep.authDisplay}`);
+      const doAuth = await askYesNo(`\n  现在运行 ${dep.authDisplay}？(Y/n) `);
+      if (doAuth) {
+        spawnSync(dep.authCmd[0], dep.authCmd.slice(1), {
+          stdio: 'inherit',
+          shell: process.platform === 'win32',
+        });
+      } else {
+        console.log(`  请稍后手动运行：${dep.authDisplay}`);
+      }
+    }
+
+    console.log('');
   }
 
-  // Step 4: Show push commands
-  console.log('\nStep 4/4: Push plan...');
-  if (wbToken) {
-    console.log(`  [Recommended] Use +whiteboard-update to update whiteboard (token: ${wbToken})`);
-    console.log(`  Command:`);
-    console.log(`    feishu-preview convert "${absInput}" \\`);
-    console.log(`      | awk '/\`\`\`mermaid/{p=1;next} /^\`\`\`$/{if(p)exit} p' \\`);
-    console.log(`      | lark-cli docs +whiteboard-update --whiteboard-token "${wbToken}" --overwrite --yes`);
-  } else {
-    const title = entry.diagram_title || '(set diagram_title in .feishu-index.json)';
-    console.log(`  [First-time] Insert mermaid block after heading: "${title}"`);
-    console.log(`  Command:`);
-    console.log(`    lark-cli docs +update --doc "${docUrl}" --mode insert_after \\`);
-    console.log(`      --selection-by-title "${title}" --markdown @"${tmpFile}"`);
+  if (allOk) {
+    console.log('\n✅ 所有依赖已就绪 / All dependencies ready\n');
   }
 
-  idx[basename] = { ...entry, doc_url: docUrl, last_synced: new Date().toISOString() };
-  writeIndex(idx);
-  console.log(`\n✅ ${INDEX_FILE} updated`);
-  process.exit(0);
+  return allOk;
 }
 
-usage();
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+async function main() {
+  const args    = process.argv.slice(2);
+  const command = args[0];
+
+  if (!command) usage();
+
+  // ── doctor ──────────────────────────────────────────────────────────────────
+  if (command === 'doctor') {
+    const ok = await runDoctor();
+    process.exit(ok ? 0 : 1);
+  }
+
+  // ── install-skill ────────────────────────────────────────────────────────────
+  if (command === 'install-skill') {
+    const os = require('os');
+    const skillsDir = path.join(os.homedir(), '.claude', 'skills', 'feishu-preview');
+    const srcSkill  = path.join(BIN_DIR, '..', 'skills', 'feishu-preview', 'SKILL.md');
+    if (!fs.existsSync(srcSkill)) {
+      console.error(`Error: SKILL.md not found at: ${srcSkill}`);
+      process.exit(1);
+    }
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.copyFileSync(srcSkill, path.join(skillsDir, 'SKILL.md'));
+    console.log(`✅ Claude Code skill installed`);
+    console.log(`   Location: ${path.join(skillsDir, 'SKILL.md')}`);
+    console.log(`\nIn Claude Code, you can now say:`);
+    console.log(`   "Check my-doc.md for Feishu compatibility"`);
+    console.log(`   "Preview my-doc.md"`);
+    console.log(`   "Sync my-doc.md to Feishu"`);
+    process.exit(0);
+  }
+
+  // Commands below require a <file> argument
+  const inputFile = args[1];
+  if (!inputFile) usage();
+  if (!fs.existsSync(inputFile)) {
+    console.error(`Error: File not found: ${inputFile}`);
+    process.exit(1);
+  }
+
+  const absInput = path.resolve(inputFile);
+  const dir      = path.dirname(absInput);
+  const basename = path.basename(absInput);
+  const indexPath = path.join(dir, INDEX_FILE);
+
+  function readIndex() {
+    if (!fs.existsSync(indexPath)) return {};
+    try { return JSON.parse(fs.readFileSync(indexPath, 'utf-8')); }
+    catch (_) { return {}; }
+  }
+
+  function writeIndex(data) {
+    fs.writeFileSync(indexPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+  }
+
+  // ── check ──────────────────────────────────────────────────────────────────
+  if (command === 'check') {
+    const result = spawnSync(
+      process.execPath,
+      [path.join(BIN_DIR, 'feishu-compat.js'), absInput, '--check'],
+      { stdio: 'inherit' }
+    );
+    process.exit(result.status ?? 0);
+  }
+
+  // ── convert ────────────────────────────────────────────────────────────────
+  if (command === 'convert') {
+    const outIdx    = args.indexOf('-o');
+    const outputFile = outIdx !== -1 ? args[outIdx + 1] : null;
+    const writeInPlace = args.includes('-w');
+    const extra = outputFile ? ['-o', outputFile] : writeInPlace ? ['-w'] : [];
+    const result = spawnSync(
+      process.execPath,
+      [path.join(BIN_DIR, 'feishu-compat.js'), absInput, ...extra],
+      { stdio: 'inherit' }
+    );
+    process.exit(result.status ?? 0);
+  }
+
+  // ── preview ────────────────────────────────────────────────────────────────
+  if (command === 'preview') {
+    const extraFlags = args.filter(a => a.startsWith('--'));
+    const result = spawnSync(
+      process.execPath,
+      [path.join(BIN_DIR, 'render-preview.js'), absInput, ...extraFlags],
+      { stdio: 'inherit' }
+    );
+    process.exit(result.status ?? 0);
+  }
+
+  // ── status ─────────────────────────────────────────────────────────────────
+  if (command === 'status') {
+    const idx   = readIndex();
+    const entry = idx[basename];
+    if (!entry) {
+      console.log(`[${basename}] Not found in ${INDEX_FILE} — never synced.`);
+    } else {
+      console.log(`[${basename}] Sync status:`);
+      console.log(`  doc_url:     ${entry.doc_url || '(not recorded)'}`);
+      console.log(`  last_synced: ${entry.last_synced || '(never)'}`);
+      const wbs     = entry.whiteboards || {};
+      const wbCount = Object.keys(wbs).length;
+      if (wbCount > 0) {
+        console.log(`  whiteboards: ${wbCount} diagram(s)`);
+        Object.entries(wbs).forEach(([title, token]) => {
+          console.log(`    ${title}: ${token}`);
+        });
+      }
+    }
+    process.exit(0);
+  }
+
+  // ── push ───────────────────────────────────────────────────────────────────
+  if (command === 'push') {
+    const docUrlIdx = args.indexOf('--doc-url');
+    const docUrl    = docUrlIdx !== -1 ? args[docUrlIdx + 1] : null;
+
+    if (!docUrl) {
+      console.error('Error: push requires --doc-url <url>');
+      process.exit(1);
+    }
+
+    // Auto-check lark-cli before proceeding
+    if (!cmdExists('lark-cli')) {
+      console.log('\n⚠️  lark-cli 未安装 — push 命令需要它来同步飞书文档\n');
+      const ok = await runDoctor();
+      if (!ok || !cmdExists('lark-cli')) {
+        console.error('❌ lark-cli 不可用，无法继续。请先安装后重试。');
+        process.exit(1);
+      }
+    }
+
+    const idx     = readIndex();
+    const entry   = idx[basename] || {};
+    const wbToken = entry.whiteboard_token;
+
+    console.log(`\n=== feishu-preview push: ${basename} ===\n`);
+
+    // Step 1: Local preview
+    console.log('Step 1/4: Generating local preview...');
+    spawnSync(
+      process.execPath,
+      [path.join(BIN_DIR, 'render-preview.js'), absInput],
+      { stdio: 'inherit' }
+    );
+    console.log('Review the preview in your browser, then continue.\n');
+
+    // Step 2: Feishu compatibility conversion
+    console.log('Step 2/4: Converting to Feishu-compatible format...');
+    const tmpFile     = path.join(require('os').tmpdir(), `${basename}-feishu.md`);
+    spawnSync(
+      process.execPath,
+      [path.join(BIN_DIR, 'feishu-compat.js'), absInput, '-o', tmpFile],
+      { stdio: 'inherit' }
+    );
+
+    // Step 3: Read current document state
+    console.log('\nStep 3/4: Reading current Feishu document state...');
+    console.log(`  lark-cli docs +fetch --doc "${docUrl}" --format json\n`);
+    try {
+      const fetchOut = execFileSync(
+        'lark-cli',
+        ['docs', '+fetch', '--doc', docUrl, '--format', 'json'],
+        { encoding: 'utf-8' }
+      );
+      const wbTokens = extractWhiteboardTokens(JSON.parse(fetchOut));
+      if (wbTokens.length > 0) {
+        console.log('  Found whiteboard block token(s):');
+        wbTokens.forEach(t => console.log(`    - ${t}`));
+      } else {
+        console.log('  No whiteboard blocks found (no Mermaid diagrams in document yet).');
+      }
+    } catch (e) {
+      console.error(`  Warning: lark-cli +fetch failed: ${e.message}`);
+    }
+
+    // Step 4: Show push commands
+    console.log('\nStep 4/4: Push plan...');
+    if (wbToken) {
+      console.log(`  [Recommended] Use +whiteboard-update to update whiteboard (token: ${wbToken})`);
+      console.log(`  Command:`);
+      console.log(`    feishu-preview convert "${absInput}" \\`);
+      console.log(`      | awk '/\`\`\`mermaid/{p=1;next} /^\`\`\`$/{if(p)exit} p' \\`);
+      console.log(`      | lark-cli docs +whiteboard-update --whiteboard-token "${wbToken}" --overwrite --yes`);
+    } else {
+      const title = entry.diagram_title || '(set diagram_title in .feishu-index.json)';
+      console.log(`  [First-time] Insert mermaid block after heading: "${title}"`);
+      console.log(`  Command:`);
+      console.log(`    lark-cli docs +update --doc "${docUrl}" --mode insert_after \\`);
+      console.log(`      --selection-by-title "${title}" --markdown @"${tmpFile}"`);
+    }
+
+    idx[basename] = { ...entry, doc_url: docUrl, last_synced: new Date().toISOString() };
+    writeIndex(idx);
+    console.log(`\n✅ ${INDEX_FILE} updated`);
+    process.exit(0);
+  }
+
+  usage();
+}
+
+main().catch(err => {
+  console.error(err.message || err);
+  process.exit(1);
+});
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function extractWhiteboardTokens(obj, tokens = []) {
