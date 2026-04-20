@@ -12,17 +12,20 @@
  *   feishu-preview push    <file> --doc-url <url>          Push to Feishu document
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs       = require('fs');
+const path     = require('path');
+const os       = require('os');
 const readline = require('readline');
 const { execFileSync, spawnSync } = require('child_process');
 
-const BIN_DIR   = __dirname;
+const BIN_DIR    = __dirname;
 const INDEX_FILE = '.feishu-index.json';
+const SETUP_MARKER = path.join(os.homedir(), '.feishu-preview-setup');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function askYesNo(question) {
+  if (!process.stdin.isTTY) return Promise.resolve(false);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise(resolve => {
     rl.question(question, answer => {
@@ -166,9 +169,20 @@ async function main() {
 
   if (!command) usage();
 
+  // ── First-run setup ──────────────────────────────────────────────────────────
+  // Runs once after installation (any command triggers it). Skipped in non-TTY
+  // environments (CI/pipes) and when `doctor` is called explicitly.
+  if (!fs.existsSync(SETUP_MARKER) && process.stdin.isTTY && command !== 'doctor') {
+    console.log('\n👋 feishu-preview 首次运行，正在检查必要依赖...\n');
+    await runDoctor();
+    fs.writeFileSync(SETUP_MARKER, new Date().toISOString(), 'utf-8');
+    console.log('');
+  }
+
   // ── doctor ──────────────────────────────────────────────────────────────────
   if (command === 'doctor') {
     const ok = await runDoctor();
+    fs.writeFileSync(SETUP_MARKER, new Date().toISOString(), 'utf-8');
     process.exit(ok ? 0 : 1);
   }
 

@@ -41,11 +41,7 @@ CLI 工具和 Claude Code 技能定义一并安装，后续版本更新自动完
 
 > 需要 Node.js ≥ 16。没有的话先去 [nodejs.org](https://nodejs.org) 下载安装。
 
-安装后运行一次依赖检查，工具会自动检测并引导安装 `lark-cli` 等依赖：
-
-```bash
-feishu-preview doctor
-```
+安装後首次运行任意命令时，工具会**自动**检查依赖（如 `lark-cli`）并交互式引导安装。无需手动执行额外步骤。
 
 ### 第二步：使用
 
@@ -315,11 +311,7 @@ Future updates are applied automatically at startup — no manual reinstall need
 
 > Requires Node.js ≥ 16. Download from [nodejs.org](https://nodejs.org) if needed.
 
-After installing, run the dependency checker once. It detects missing tools (like `lark-cli`) and walks you through installing them:
-
-```bash
-feishu-preview doctor
-```
+On first use, the tool **automatically** checks for required dependencies (such as `lark-cli`) and walks you through installing any that are missing. No extra steps needed.
 
 ### Step 2: Use It
 
