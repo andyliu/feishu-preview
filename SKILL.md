@@ -78,19 +78,21 @@ docs/
 ## 三、本地预览（文字 + 图表整体预览）
 
 ```bash
-# 生成预览 HTML 并自动在浏览器打开
+# 精确模式（默认）— 使用飞书官方 whiteboard-cli 渲染，与飞书完全一致
 feishu-preview preview docs/diagrams/device-keygen.md
-# 或直接调用
-node render-preview.js docs/diagrams/device-keygen.md
 
-# 生成后文件在同目录: device-keygen.preview.html
+# 快速模式 — Mermaid.js CDN 交互 SVG，秒级渲染，适合快速调试语法
+feishu-preview preview docs/diagrams/device-keygen.md --fast
 ```
 
-**预览说明：**
-- 文字部分：完整 Markdown 渲染（标题、列表、表格、代码块、加粗等）
-- 图表部分：使用 Mermaid v9（CDN，不需要本地安装）渲染
-- `<br>` 换行：预览脚本自动将飞书格式的 `<br>` 转为 `<br/>` 供浏览器渲染
-- 预览效果 ≈ 飞书实际效果（v8/v9 差异极小，仅个别新语法）
+**⚠️ 始终使用精确模式（不加 `--fast`）生成最终预览。只有在调试 Mermaid 语法错误时才使用快速模式。**
+
+**两种模式说明：**
+
+| 模式 | 命令 | 渲染引擎 | 用途 |
+|---|---|---|---|
+| **精确模式**（默认） | 不加 `--fast` | `@larksuite/whiteboard-cli` — 飞书官方引擎，输出 PNG | 最终确认，与飞书展示效果像素级一致 |
+| **快速模式** | 加 `--fast` | Mermaid.js v10 CDN — 交互 SVG | 快速调试语法，不代表飞书实际效果 |
 
 ---
 
