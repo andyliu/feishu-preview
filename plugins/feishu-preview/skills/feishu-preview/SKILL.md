@@ -14,6 +14,9 @@ triggers:
   - draw flowchart
   - draw sequence diagram
   - draw state diagram
+  - generate diagram
+  - describe diagram
+  - create diagram from description
   - check feishu compatibility
   - feishu preview
   - preview markdown
@@ -27,6 +30,9 @@ triggers:
   - 更新图表
   - 画流程图
   - 画时序图
+  - 帮我画
+  - 画一个图
+  - 生成图表
   - 检查飞书兼容性
   - 预览文档
   - 预览 markdown
@@ -84,6 +90,40 @@ Write/Edit Mermaid in .md file
     └── SYNC    → lark-cli (primary) or feishu-mcp (fallback)
                   iterative update via +whiteboard-update if tokens are known
                   first-time: insert mermaid block → Feishu auto-converts to whiteboard
+```
+
+---
+
+## Entry Point 0 — Generate Diagram from Natural Language
+
+Triggered when: user describes a diagram in plain language and there is no existing Mermaid code to edit.
+("画一个 X 的流程图", "draw a sequence diagram showing Y", "help me visualize Z")
+
+```
+1. Identify target file
+   - If user specifies a file: use it
+   - If not: ask "Which file should I write this into?" before proceeding
+
+2. Write Mermaid code directly into the file (Edit or Write tool)
+   Guidelines for Feishu-compatible output from the start:
+   - Use stateDiagram (not stateDiagram-v2)
+   - Use <br> (not <br/>) for line breaks in notes
+   - Use ＜ (U+FF1C fullwidth) instead of < inside Note blocks
+   - Remove double-quotes from Note text (they break Feishu's parser)
+   - Do not use v10+ syntax (architecture-beta, etc.)
+
+3. Run: feishu-preview check <file>.md
+   → ✅ No issues: "Diagram written, Feishu-compatible." Done.
+   → ⚠️ Issues found: DO NOT blindly run `convert -w`.
+     Instead, apply reasoning:
+     - Read the exact incompatible construct(s) reported
+     - Understand why each is incompatible (see Compatibility Rules)
+     - Edit the Mermaid block directly with corrected syntax
+     - Re-run `feishu-preview check` to verify the fix
+     This produces cleaner fixes than mechanical rule substitution.
+
+4. Ask: "Diagram written and verified. Preview? (default: no)"
+   If yes → Entry B.
 ```
 
 ---
@@ -237,6 +277,52 @@ Values are whiteboard tokens from `lark-cli docs +fetch --format json`.
 - `mcp__feishu__fetch-doc` — read document
 - `mcp__feishu__update-doc` — update document
 - `mcp__feishu__create-doc` — create document
+
+---
+
+## Error Recovery — Reasoning-Based Repair
+
+When `feishu-preview check` or `whiteboard-cli` reports an error, use reasoning first before
+falling back to mechanical conversion. This produces cleaner results for edge cases.
+
+### When `feishu-preview check` reports issues
+
+**Before running `convert -w`**, ask: "Can I understand exactly what's wrong and fix it precisely?"
+
+```
+1. Read the reported incompatible construct (line number, type)
+2. Look up the Compatibility Rules table above
+3. Apply minimal targeted edit to the Mermaid block (Edit tool)
+4. Re-run: feishu-preview check <file>.md
+5. If still failing after one reasoning attempt → fall back to: feishu-preview convert <file>.md -w
+```
+
+Why: `convert -w` applies all rules uniformly. For generated code that's almost correct,
+a targeted edit avoids accidental changes to unrelated constructs.
+
+### When accurate preview fails (blank diagram or error box)
+
+```
+1. Read whiteboard-cli stderr — it often identifies the exact line or construct
+2. Cross-reference with the Compatibility Rules table
+3. If the cause is identifiable: edit <file>.md to fix that specific construct
+4. Re-run accurate preview: feishu-preview preview <file>.md
+5. If cause is unclear: switch to fast mode for browser console details
+   feishu-preview preview <file>.md --fast
+   → Open browser console (F12) → Console tab → read the Mermaid parse error
+   → Fix the source, then switch back to accurate mode to verify
+```
+
+### When lark-cli sync fails
+
+```
+1. Check if it's an auth issue: lark-cli auth login
+2. Check if the whiteboard token is stale (document was recreated):
+   lark-cli docs +fetch --doc <url> --format json | jq '.blocks[] | select(.block_type == "whiteboard")'
+   Update .feishu-index.json with the new token.
+3. Check if the Mermaid code has Feishu incompatibilities that slipped through:
+   feishu-preview check <file>.md
+```
 
 ---
 
