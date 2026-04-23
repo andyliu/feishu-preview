@@ -66,9 +66,11 @@ These rules have the highest priority and override all other considerations.
 4. 🔴 **NEVER substitute another Markdown preview tool** for `feishu-preview preview`
 
 ### Sync — do not do these:
-5. Do not use `overwrite` mode on the whole document — it destroys blocks other than the target
-6. Do not skip the preview step before syncing
-7. Do not hand-edit Mermaid code in `.md` files to work around compatibility — run `convert` instead
+5. 🔴 **NEVER use `replace_all` mode** — triggers full document re-render; every whiteboard token is invalidated and all diagrams disappear, even if only one character changed
+6. 🔴 **NEVER use `replace_range` across a whiteboard block** — if the selection range includes a rendered whiteboard, it will be deleted
+7. Do not use `overwrite` mode unless rebuilding the entire document from scratch (all whiteboards lost; must re-insert all diagrams)
+8. Do not skip the preview step before syncing
+9. Do not hand-edit Mermaid code in `.md` files to work around compatibility — run `convert` instead
 
 ---
 
@@ -204,6 +206,125 @@ Triggered when: user says "sync to Feishu", "push to Feishu", or confirms after 
 
 5. Report result with Feishu document link
 ```
+
+---
+
+## Feishu Document Safety Rules
+
+### lark-cli Operation Safety Hierarchy
+
+From safest to most dangerous:
+
+| Mode | Safety | Use When |
+|---|---|---|
+| `insert_before` / `insert_after` | ✅ Safest | Adding content near a heading — never touches existing blocks |
+| `replace_range` (precise) | ⚠️ Safe if range excludes whiteboards | Editing text-only sections |
+| `delete_range` | ⚠️ Safe if range excludes whiteboards | Removing text-only sections |
+| `replace_all` | 🔴 **FORBIDDEN** | Never — destroys all whiteboard tokens |
+| `overwrite` | 🔴 Destructive | Only when rebuilding entire document; all whiteboards lost |
+
+### Why `replace_all` Destroys Diagrams
+
+When `replace_all` is used (even to change a single character), Feishu triggers a full document re-render. All whiteboard blocks — which are rendered from the original Mermaid code — lose their token references. The diagrams visually disappear from the document. Recovery requires re-inserting every Mermaid code block from scratch.
+
+### Safe `replace_range` Usage
+
+Before using `replace_range`:
+1. Run `lark-cli docs +fetch --doc <url> --format json` to inspect block positions
+2. Confirm the selection range (`--selection-with-ellipsis "start...end"`) does NOT span any whiteboard block
+3. Always use `--dry-run` first
+
+### Whiteboard Recovery (if diagrams are lost)
+
+If a whiteboard was destroyed (by `replace_all` or bad `replace_range`):
+```bash
+# Re-insert the mermaid code block before the section heading
+# Feishu will re-render it as a new whiteboard block
+lark-cli docs +update --doc <url> --mode insert_before \
+  --selection-by-title "## Section Heading" \
+  --markdown "$MERMAID_CONTENT" --dry-run
+# After confirming: remove --dry-run
+# Then fetch the new whiteboard token and update .feishu-index.json
+```
+
+### Document Format Conventions
+
+These conventions apply when writing content that will be synced to Feishu:
+
+- **Diagram callout**: every diagram must have a summary callout block (before or after the diagram)
+- **Note block steps**: format as `1. 中文描述: pseudocode(params)` — e.g., `1. 派生会话密钥: HKDF(euid, "info", sn, 32)`
+- **Step numbering**: use regular digits `1. 2. 3.` — do NOT use circled digits `①②③`
+- **Phase numbering**: use Chinese numerals `阶段一、阶段二` — do NOT use `阶段1、阶段2`
+- **Heading attributes**: do NOT write `{folded="true"}` or any `{...}` attributes in headings — Feishu may render them as literal text
+
+---
+
+## Feishu Callout Syntax
+
+Feishu callout blocks (高亮提示块) are not standard Markdown. `lark-cli docs +update` supports two syntaxes:
+
+### Option A — Standard `>` blockquote (auto-converted)
+
+```markdown
+> This text will be auto-converted to a Feishu callout by lark-cli.
+```
+
+Converts to a callout with `emoji="glass_of_milk"` + `background-color="light-orange"`. **Emoji and color cannot be controlled.**
+
+### Option B — Explicit `<callout>` tag (recommended)
+
+```html
+<callout emoji="bulb" background-color="light-blue">
+Content here. Supports **bold**, `code`, [links](url).
+
+- Lists work
+- Blank line = new paragraph inside callout
+</callout>
+```
+
+### Callout Attributes
+
+| Attribute | Required | Notes |
+|---|---|---|
+| `emoji` | No | Short code (see table below). Invalid code falls back to `gift` 🎁 |
+| `background-color` | No | See color table below |
+| `border-color` | No | Feishu ignores this — automatically matches background-color. Can omit. |
+
+### Available Colors
+
+| Value | Color | Use For |
+|---|---|---|
+| `light-orange` | Orange | Overview / document positioning |
+| `light-blue` | Blue | Info / tips / explanations |
+| `light-yellow` | Yellow | Warnings / cautions |
+| `light-green` | Green | Security / verification / success |
+| `light-purple` | Purple | References / citations |
+| `light-red` | Red | Danger / prohibitions |
+| `light-grey` | Grey | General / neutral |
+
+### Verified Emoji Short Codes
+
+| Code | Emoji | Use For |
+|---|---|---|
+| `glass_of_milk` | 🥛 | General / document overview |
+| `bulb` | 💡 | Tips / explanations |
+| `heart` | ❤️ | Purpose / importance |
+| `star` | ⭐ | Highlights / features |
+| `memo` | 📝 | Summary / spec |
+| `pushpin` | 📌 | References |
+| `rocket` | 🚀 | Performance / optimization |
+| `lock` | 🔒 | Security / encryption |
+| `fire` | 🔥 | Critical / urgent |
+
+**Known broken codes** (fall back to 🎁): `warning`, `check_mark`, `exclamation`
+
+### Callout Rules
+
+- Do not nest callouts inside callouts — Feishu does not support this
+- Use blank lines to create new paragraphs inside a callout
+- Use `<br>` (not `<br/>`) for inline line breaks inside a callout
+- `lark-cli docs +fetch` returns callouts in `<callout>` tag format
+- `border-color` can always be omitted
 
 ---
 
