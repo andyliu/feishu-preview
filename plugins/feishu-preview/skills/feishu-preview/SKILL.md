@@ -261,17 +261,12 @@ These conventions apply when writing content that will be synced to Feishu:
 
 ## Feishu Callout Syntax
 
-Feishu callout blocks (高亮提示块) are not standard Markdown. `lark-cli docs +update` supports two syntaxes:
+Feishu callout blocks (高亮提示块) are not standard Markdown. Only one syntax works reliably:
 
-### Option A — Standard `>` blockquote (auto-converted)
+> **Note:** Standard `>` blockquote auto-conversion has been tested and does NOT produce a callout.
+> Only the explicit `<callout>` tag renders correctly. Do not use `>` blockquotes expecting callout output.
 
-```markdown
-> This text will be auto-converted to a Feishu callout by lark-cli.
-```
-
-Converts to a callout with `emoji="glass_of_milk"` + `background-color="light-orange"`. **Emoji and color cannot be controlled.**
-
-### Option B — Explicit `<callout>` tag (recommended)
+### Explicit `<callout>` tag (only working syntax)
 
 ```html
 <callout emoji="bulb" background-color="light-blue">
