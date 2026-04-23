@@ -7,7 +7,7 @@
  *   feishu-preview install-skill                           Install Claude Code skill definition
  *   feishu-preview check   <file>                          Check Feishu compatibility (read-only)
  *   feishu-preview convert <file> [-w] [-o output.md]      Convert to Feishu-compatible format
- *   feishu-preview preview <file> [--fast]                 Local preview (accurate mode by default)
+ *   feishu-preview preview <file> [--fast|--feishu]         Local or Feishu-staged preview
  *   feishu-preview status  <file>                          Show sync status from .feishu-index.json
  *   feishu-preview push    <file> --doc-url <url>          Push to Feishu document
  */
@@ -51,9 +51,10 @@ Commands:
   check   <file>                     Check Feishu compatibility (read-only, exit 1 = issues)
   convert <file> [-o output.md]      Convert to Feishu-compatible format (stdout or new file)
           <file> -w                  Convert and overwrite source file in-place
-  preview <file> [--fast]            Generate HTML preview and open in browser
+  preview <file> [--fast|--feishu]   Generate preview and open in browser
                                        default: whiteboard-cli accurate mode (matches Feishu exactly)
-                                       --fast:  Mermaid.js mode (syntax debugging only)
+                                       --fast:   Mermaid.js mode (syntax debugging only)
+                                       --feishu: push to Feishu staging doc (100% accurate, needs lark-cli)
   status  <file>                     Show .feishu-index.json sync status
   push    <file> --doc-url <url>     Push to Feishu (requires lark-cli)
 
@@ -161,6 +162,103 @@ async function runDoctor(autoMode = false) {
   return allOk;
 }
 
+// ── Feishu staging preview ────────────────────────────────────────────────────
+
+const STAGING_CONFIG = path.join(os.homedir(), '.feishu-preview-staging.json');
+
+function openUrl(url) {
+  if (process.platform === 'win32') {
+    spawnSync('cmd.exe', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' });
+    console.log('🌐 已在浏览器打开（Windows）');
+    return;
+  }
+  if (process.platform === 'darwin') {
+    spawnSync('open', [url], { detached: true, stdio: 'ignore' });
+    console.log('🌐 已在浏览器打开（macOS）');
+    return;
+  }
+  try {
+    const ver = fs.readFileSync('/proc/version', 'utf8').toLowerCase();
+    if (ver.includes('microsoft') || ver.includes('wsl')) {
+      spawnSync('cmd.exe', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' });
+      console.log('🌐 已在浏览器打开（WSL）');
+      return;
+    }
+  } catch (_) {}
+  for (const cmd of ['xdg-open', 'sensible-browser']) {
+    if (spawnSync('which', [cmd]).status === 0) {
+      spawnSync(cmd, [url], { detached: true, stdio: 'ignore' });
+      console.log(`🌐 已在浏览器打开（${cmd}）`);
+      return;
+    }
+  }
+  console.log(`🌐 请手动打开: ${url}`);
+}
+
+async function runFeishuStagingPreview(absInput, basename) {
+  if (!cmdExists('lark-cli')) {
+    console.error('❌ --feishu 模式需要 lark-cli。运行: feishu-preview doctor');
+    process.exit(1);
+  }
+
+  // Get or create staging doc
+  let stagingUrl = null;
+  if (fs.existsSync(STAGING_CONFIG)) {
+    try { stagingUrl = JSON.parse(fs.readFileSync(STAGING_CONFIG, 'utf-8')).doc_url; } catch (_) {}
+  }
+
+  if (!stagingUrl) {
+    console.log('\n📄 首次使用 --feishu 模式，正在创建飞书暂存文档...');
+    const tmpInit = path.join(os.tmpdir(), 'feishu-preview-staging-init.md');
+    fs.writeFileSync(tmpInit, '# feishu-preview 暂存文档\n\n此文档由 feishu-preview 自动创建，用于本地预览。请勿手动编辑或删除。\n', 'utf-8');
+
+    const r = spawnSync('lark-cli', ['docs', '+create', '--title', '[feishu-preview 暂存]', '--markdown', `@${tmpInit}`], {
+      encoding: 'utf-8',
+      shell: process.platform === 'win32',
+    });
+
+    const urlMatch = (r.stdout || '').match(/https?:\/\/[^\s]+/);
+    if (!urlMatch) {
+      console.error('❌ 创建暂存文档失败:');
+      console.error(r.stderr || r.stdout || '（无输出）');
+      process.exit(1);
+    }
+    stagingUrl = urlMatch[0];
+    fs.writeFileSync(STAGING_CONFIG, JSON.stringify({ doc_url: stagingUrl, created: new Date().toISOString() }, null, 2));
+    console.log(`✅ 暂存文档已创建: ${stagingUrl}`);
+  } else {
+    console.log(`📄 使用暂存文档: ${stagingUrl}`);
+  }
+
+  // Convert to Feishu-compatible
+  console.log('\n🔄 转换飞书兼容格式...');
+  const tmpFile = path.join(os.tmpdir(), `${basename}-feishu-staging.md`);
+  spawnSync(process.execPath, [path.join(BIN_DIR, 'feishu-compat.js'), absInput, '-o', tmpFile], {
+    stdio: 'inherit'
+  });
+
+  // Overwrite staging doc
+  console.log('📤 推送到飞书暂存文档...');
+  const r2 = spawnSync('lark-cli', [
+    'docs', '+update',
+    '--doc', stagingUrl,
+    '--mode', 'overwrite',
+    '--markdown', `@${tmpFile}`,
+    '--yes',
+  ], {
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
+
+  if (r2.status !== 0) {
+    console.error('❌ 推送失败，请检查 lark-cli 认证状态');
+    process.exit(1);
+  }
+
+  console.log(`\n✅ 飞书预览就绪`);
+  openUrl(stagingUrl);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -256,6 +354,12 @@ async function main() {
   // ── preview ────────────────────────────────────────────────────────────────
   if (command === 'preview') {
     const extraFlags = args.filter(a => a.startsWith('--'));
+
+    if (extraFlags.includes('--feishu')) {
+      await runFeishuStagingPreview(absInput, basename);
+      process.exit(0);
+    }
+
     const result = spawnSync(
       process.execPath,
       [path.join(BIN_DIR, 'render-preview.js'), absInput, ...extraFlags],

@@ -63,6 +63,33 @@ function feishuCompatMermaid(code) {
   return r;
 }
 
+// ── Callout extraction: replace <callout> tags with slot divs ────────────────
+// Content is stored in CALLOUT_STORE and rendered client-side with marked.js
+
+const CALLOUT_STORE = [];
+
+function processCallouts(content) {
+  // Split on code fences so <callout> inside examples is left untouched
+  const parts = content.split(/(```[\s\S]*?```)/g);
+  return parts.map((part, i) => {
+    if (i % 2 !== 0) return part; // inside a code fence — skip
+    return part.replace(
+      /<callout([^>]*?)>([\s\S]*?)<\/callout>/gi,
+      (_, attrs, inner) => {
+        const emojiMatch = attrs.match(/emoji="([^"]+)"/i);
+        const bgMatch    = attrs.match(/background-color="([^"]+)"/i);
+        const idx = CALLOUT_STORE.length;
+        CALLOUT_STORE.push({
+          emoji: emojiMatch ? emojiMatch[1] : 'glass_of_milk',
+          bg:    bgMatch    ? bgMatch[1]    : 'light-orange',
+          md:    inner.trim()
+        });
+        return `\n<div class="feishu-callout-slot" id="callout-slot-${idx}"></div>\n`;
+      }
+    );
+  }).join('');
+}
+
 // ── Render one Mermaid block → PNG via whiteboard-cli ────────────────────────
 
 function renderMermaidPng(code, idx) {
@@ -101,6 +128,7 @@ function renderMermaidPng(code, idx) {
 process.stderr.write(`📄 处理: ${title}${fastMode ? ' [快速模式]' : ' [精确模式]'}\n`);
 
 let processed = feishuCompatDoc(markdown);
+processed = processCallouts(processed);
 let total = 0, ok = 0, fail = 0;
 
 if (fastMode) {
@@ -133,11 +161,14 @@ if (fastMode) {
 }
 
 const mdJson     = JSON.stringify(processed);
+const calloutNote = CALLOUT_STORE.length > 0
+  ? `<br>  · <code>&lt;callout&gt;</code> 高亮块已渲染（${CALLOUT_STORE.length} 个，颜色/emoji 与飞书一致）`
+  : '';
 const bannerNote = fastMode
   ? '· <strong>快速模式</strong>：图表由 Mermaid.js v10 渲染（可交互，但与飞书视觉不同）<br>  · 运行不带 <code>--fast</code> 可切换为精确模式（whiteboard-cli 飞书同款）'
   : (ok === total && total > 0
-      ? '· <strong>精确模式</strong>：图表由 whiteboard-cli（飞书同款引擎）预渲染，视觉与飞书一致'
-      : '· ⚠ whiteboard-cli 渲染部分失败，失败图表显示为错误信息');
+      ? `· <strong>精确模式</strong>：图表由 whiteboard-cli（飞书同款引擎）预渲染，视觉与飞书一致${calloutNote}`
+      : `· ⚠ whiteboard-cli 渲染部分失败，失败图表显示为错误信息${calloutNote}`);
 
 // ── HTML template ─────────────────────────────────────────────────────────────
 
@@ -197,6 +228,13 @@ body{margin:0;background:#fff;font-family:-apple-system,BlinkMacSystemFont,"Ping
 /* error fallback */
 .wb-err{background:#fff2f0;border:1px solid #ffa39e;border-radius:4px;padding:12px 16px;margin:16px 0;font-size:13px;color:#a8071a}
 .wb-src{background:#fafafa;border:1px solid #eee;border-radius:4px;padding:10px;font-size:12px;overflow-x:auto;white-space:pre;margin-top:8px;max-height:200px;overflow-y:auto}
+/* feishu callout 高亮块 */
+.feishu-callout{display:flex;align-items:flex-start;gap:10px;border-radius:6px;padding:12px 16px;margin:12px 0}
+.feishu-callout .cb{flex:1;min-width:0}
+.feishu-callout .cb>p:first-child{margin-top:0}
+.feishu-callout .cb>p:last-child{margin-bottom:0}
+.feishu-callout .cb>ul:first-child,.feishu-callout .cb>ol:first-child{margin-top:0}
+.feishu-callout-slot{display:none}
 /* banner */
 #btoggle{position:fixed;bottom:16px;right:16px;background:#e8f4ff;border:1px solid #91caff;border-radius:20px;padding:5px 14px;font-size:12px;color:#0958d9;cursor:pointer;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.1);user-select:none}
 #bbody{position:fixed;bottom:50px;right:16px;background:#e8f4ff;border:1px solid #91caff;border-radius:8px;padding:12px 16px;font-size:12px;color:#0958d9;line-height:1.7;z-index:99;max-width:420px;box-shadow:0 4px 16px rgba(0,0,0,.1);display:none}
@@ -226,10 +264,32 @@ body{margin:0;background:#fff;font-family:-apple-system,BlinkMacSystemFont,"Ping
   · 渲染统计：${ok}/${total} 成功${fastMode ? ' &nbsp;<span id="mver"></span>' : ''}
 </div>
 
+<script id="callout-data" type="application/json">${JSON.stringify(CALLOUT_STORE)}</script>
 <script id="md" type="application/json">${mdJson}</script>
 <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js" crossorigin="anonymous"></script>
-<!-- TOC builder (shared by both modes) -->
+<!-- Callout renderer + TOC builder (shared by both modes) -->
 <script>
+function renderCallouts() {
+  var storeEl = document.getElementById('callout-data');
+  if (!storeEl) return;
+  var store = JSON.parse(storeEl.textContent || '[]');
+  if (!store.length) return;
+  var C = {'light-orange':{bg:'#FFF3E0',bd:'#FB8C00'},'light-blue':{bg:'#E3F2FD',bd:'#42A5F5'},'light-yellow':{bg:'#FFFDE7',bd:'#FDD835'},'light-green':{bg:'#E8F5E9',bd:'#66BB6A'},'light-purple':{bg:'#F3E5F5',bd:'#AB47BC'},'light-red':{bg:'#FFEBEE',bd:'#EF5350'},'light-grey':{bg:'#F5F5F5',bd:'#BDBDBD'},'light-gray':{bg:'#F5F5F5',bd:'#BDBDBD'}};
+  var E = {glass_of_milk:'🥛',bulb:'💡',heart:'❤️',star:'⭐',memo:'📝',pushpin:'📌',rocket:'🚀',lock:'🔒',fire:'🔥'};
+  store.forEach(function(c, i) {
+    var slot = document.getElementById('callout-slot-' + i);
+    if (!slot) return;
+    var color = C[c.bg] || C['light-orange'];
+    var emoji = E[c.emoji] || '📝';
+    var inner = marked.parse(c.md);
+    var div = document.createElement('div');
+    div.className = 'feishu-callout';
+    div.style.cssText = 'background:' + color.bg + ';border-left:4px solid ' + color.bd + ';border-radius:6px;padding:12px 16px;margin:12px 0;display:flex;align-items:flex-start;gap:10px';
+    div.innerHTML = '<span style="font-size:18px;flex-shrink:0;line-height:1.6;margin-top:1px">' + emoji + '</span><div class="cb" style="flex:1;min-width:0">' + inner + '</div>';
+    slot.parentNode.replaceChild(div, slot);
+  });
+}
+
 function buildTOC() {
   var headings = document.querySelectorAll('#content h1,#content h2,#content h3');
   var list = document.getElementById('toc-list');
@@ -290,6 +350,7 @@ marked.use({ renderer: { code(t,l) {
 }}});
 var raw=JSON.parse(document.getElementById('md').textContent);
 document.getElementById('content').innerHTML=marked.parse(raw);
+renderCallouts();
 buildTOC();
 for(var i=0;i<srcs.length;i++){
   var el=document.getElementById('mw'+i);
@@ -308,6 +369,7 @@ for(var i=0;i<srcs.length;i++){
   var raw=JSON.parse(document.getElementById('md').textContent);
   marked.setOptions({ mangle:false, headerIds:false });
   document.getElementById('content').innerHTML=marked.parse(raw);
+  renderCallouts();
   buildTOC();
 })();
 </script>`}
